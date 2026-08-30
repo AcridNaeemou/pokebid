@@ -2,21 +2,38 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const crypto = require('crypto');
+const fs = require('fs');
 const { Server } = require('socket.io');
 const battlePool = require('./battle_pool.json');
 
 const app = express();
-app.use(express.static(path.join(__dirname, 'public')));
+
+// Health check (used by hosts like Render to know the service is alive).
+app.get('/healthz', (req, res) => {
+  res.status(200).send('ok');
+});
+
+// List the background-music tracks so the client auto-discovers them.
+// Drop any .mp3/.ogg/.m4a/.wav/.aac into public/music/ and it's picked up automatically.
+app.get('/music', (req, res) => {
+  try {
+    const dir = path.join(__dirname, 'public', 'music');
+    const files = fs.readdirSync(dir)
+      .filter((f) => /\.(mp3|ogg|m4a|wav|aac)$/i.test(f))
+      .sort();
+    res.json(files.map((f) => '/music/' + encodeURIComponent(f)));
+  } catch (e) {
+    res.json([]);
+  }
+});
 
 // Expose the curated pool so players can browse all available Pokémon.
 app.get('/pool', (req, res) => {
   res.json(battlePool.map((p) => ({ id: p.id, name: p.name, types: p.types, base: p.base })));
 });
 
-// Health check (used by hosts like Render to know the service is alive).
-app.get('/healthz', (req, res) => {
-  res.status(200).send('ok');
-});
+// Static files (mounted after the API routes above so /music isn't shadowed).
+app.use(express.static(path.join(__dirname, 'public')));
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
 
@@ -29,6 +46,7 @@ const MIN_PLAYERS = 2;
 const MAX_PLAYERS = 5;
 const TURN_SECONDS = parseInt(process.env.TURN_SECONDS || '30', 10);
 const REVEAL_SECONDS = parseFloat(process.env.REVEAL_SECONDS || '4');
+const COUNTDOWN_MS = 3000; // pre-draft countdown before the first auction
 
 const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const STAT_LABELS = { hp: 'HP', atk: 'Attack', def: 'Defense', spa: 'Sp. Atk', spd: 'Sp. Def', spe: 'Speed' };
@@ -87,7 +105,7 @@ function createRoom(playerId, name, numPlayers) {
     code,
     numPlayers,
     players: Array(numPlayers).fill(null),
-    state: 'waiting', // waiting | lobby | auction | reveal | done
+    state: 'waiting', // waiting | lobby | countdown | auction | reveal | done | ended
     turnOrder: [],
     nextPos: 0,
     roster: [],
@@ -103,6 +121,9 @@ function createRoom(playerId, name, numPlayers) {
     teams: Array.from({ length: numPlayers }, () => []),
     turnTimer: null,
     revealTimer: null,
+    countdownTimer: null,
+    countdownEnd: null,
+    endedBy: null,
     lastActivity: Date.now(),
   };
   room.players[0] = { id: playerId, name: name || 'Player 1', connected: true, socketId: null };
@@ -114,6 +135,7 @@ function touch(room) { room.lastActivity = Date.now(); }
 
 function clearTurnTimer(room) { if (room.turnTimer) { clearTimeout(room.turnTimer); room.turnTimer = null; } }
 function clearRevealTimer(room) { if (room.revealTimer) { clearTimeout(room.revealTimer); room.revealTimer = null; } }
+function clearCountdownTimer(room) { if (room.countdownTimer) { clearTimeout(room.countdownTimer); room.countdownTimer = null; } }
 
 function buildView(room, playerIndex) {
   const pokemon = room.roster.map((p, i) => {
@@ -151,6 +173,8 @@ function buildView(room, playerIndex) {
     serverNow: Date.now(),
     turnSeconds: TURN_SECONDS,
     revealSeconds: REVEAL_SECONDS,
+    countdownEnd: room.countdownEnd,
+    endedBy: room.endedBy,
   };
 }
 
@@ -372,10 +396,20 @@ io.on('connection', (socket) => {
 
   socket.on('start', () => {
     const code = socket.data.roomCode;
+    const idx = socket.data.playerIndex;
     const room = rooms.get(code);
     if (!room || room.state !== 'lobby') return;
+    if (idx !== 0) { socket.emit('error', 'Only the host can start the game.'); return; }
     if (!allJoined(room)) { socket.emit('error', 'Waiting for all players to join.'); return; }
-    startAuction(room);
+    // 3-second pre-draft countdown so players can get ready.
+    clearCountdownTimer(room);
+    room.state = 'countdown';
+    room.countdownEnd = Date.now() + COUNTDOWN_MS;
+    room.countdownTimer = setTimeout(() => {
+      if (room.state !== 'countdown') return;
+      startAuction(room);
+      broadcast(room);
+    }, COUNTDOWN_MS);
     broadcast(room);
   });
 
@@ -426,6 +460,15 @@ io.on('connection', (socket) => {
     if (pl && pl.socketId === socket.id) {
       pl.connected = false;
       pl.socketId = null;
+      // If anyone leaves while the game is live, end it for everyone.
+      const active = ['waiting', 'lobby', 'countdown', 'auction', 'reveal'].includes(room.state);
+      if (active) {
+        room.state = 'ended';
+        room.endedBy = pl.name;
+        clearTurnTimer(room);
+        clearRevealTimer(room);
+        clearCountdownTimer(room);
+      }
       broadcast(room);
     }
   });
@@ -445,6 +488,7 @@ setInterval(() => {
     if (!anyConnected || idle) {
       clearTurnTimer(room);
       clearRevealTimer(room);
+      clearCountdownTimer(room);
       rooms.delete(code);
       console.log(`cleaned up room ${code}`);
     }

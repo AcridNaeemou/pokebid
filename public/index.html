@@ -331,6 +331,15 @@ input:focus { border-color: var(--orange); }
 .now-playing .np-label { color: var(--muted); font-weight: 600; }
 .now-playing .np-name { color: var(--amber); font-weight: 800; }
 
+/* pre-draft countdown screen */
+.cd-huge {
+  font-size: 150px; font-weight: 900; line-height: 1;
+  background: linear-gradient(180deg, #ffe3c2, var(--orange-2) 55%, var(--orange-deep));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+  animation: cd-pop .9s ease-in-out infinite;
+}
+@keyframes cd-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
+
 /* fixed bottom action bar (bid controls float above content) */
 .action-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
@@ -451,6 +460,22 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       <button type="button" id="btn-start" class="btn primary hidden">Start draft</button>
       <button type="button" id="btn-copy-link" class="btn primary">Copy invite link</button>
       <button type="button" id="btn-leave" class="btn ghost">Leave room</button>
+      <p id="lobby-wait-host" class="muted hidden">Waiting for the host to start…</p>
+    </div>
+  </div>
+
+  <!-- COUNTDOWN -->
+  <div id="screen-countdown" class="screen center hidden">
+    <div class="cd-huge" id="countdown-num">3</div>
+    <div class="muted" style="font-size:18px">Get ready — the draft is about to start!</div>
+  </div>
+
+  <!-- ENDED -->
+  <div id="screen-ended" class="screen center hidden">
+    <div class="panel" style="max-width:420px">
+      <h2 style="font-size:24px">Game over</h2>
+      <p id="ended-msg" class="muted"></p>
+      <button type="button" class="btn primary" id="btn-ended-home">Back to main menu</button>
     </div>
   </div>
 
@@ -547,7 +572,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   let poolCache = null;
 
   const $ = (id) => document.getElementById(id);
-  const screens = ['screen-landing', 'screen-lobby', 'screen-game', 'screen-done'];
+  const screens = ['screen-landing', 'screen-lobby', 'screen-countdown', 'screen-ended', 'screen-game', 'screen-done'];
   function show(screen) { screens.forEach((s) => $(s).classList.toggle('hidden', s !== screen)); }
 
   let toastTimer;
@@ -629,6 +654,8 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
         tone(320, 160, 0.20, 0.05);
       },
       turn: () => { tone(880, 880, 0.09, 0.08); tone(1174, 1174, 0.16, 0.08, 'sine', 0.10); },
+      count: () => { tone(440, 440, 0.12, 0.14); },
+      go: () => { tone(523, 523, 0.10, 0.14); tone(784, 784, 0.28, 0.14, 'sine', 0.10); },
       warn: () => { tone(660, 660, 0.12, 0.09, 'square'); tone(660, 660, 0.12, 0.09, 'square', 0.18); },
       win: () => { tone(523, 523, 0.12, 0.10); tone(659, 659, 0.12, 0.10, 'sine', 0.11); tone(784, 784, 0.22, 0.10, 'sine', 0.22); },
       unlock: () => { ensure(); },
@@ -654,7 +681,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   // new mp3/ogg/m4a/wav/aac into public/music/ is picked up automatically.
   let BGM_FILES = [];
   let bgmLoaded = false;
-  const BGM_VOL = 0.15;
+  const BGM_VOL = 0.10; // keep background music quiet
   const CROSSFADE = 3.0;
 
   let musicOn = true;
@@ -822,6 +849,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     catch { prompt('Copy this link:', url); }
   });
   $('btn-leave').addEventListener('click', () => { if (socket) socket.disconnect(); location.reload(); });
+  $('btn-ended-home').addEventListener('click', () => { if (socket) socket.disconnect(); location.reload(); });
 
   // ---------- pool modal ----------
   function renderPool(list, q) {
@@ -859,7 +887,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   // ---------- render ----------
   function render() {
     if (!state) return;
+    stopCountdownScreen();
     if (state.state === 'waiting' || state.state === 'lobby') { renderLobby(); return; }
+    if (state.state === 'countdown') { renderCountdownScreen(); return; }
+    if (state.state === 'ended') { hideReveal(); renderEnded(); return; }
     if (state.state === 'done') { hideReveal(); renderDone(); return; }
     show('screen-game');
     $('game-code').textContent = state.code;
@@ -896,8 +927,9 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     }
 
     const allIn = state.players.every((p) => p && p.connected);
+    const isHost = myIndex === 0;
     if (state.state === 'lobby') {
-      $('lobby-title').textContent = allIn ? 'Everyone\'s here!' : 'Waiting for players';
+      $('lobby-title').textContent = allIn ? (isHost ? 'Everyone\'s here!' : 'Waiting for the host…') : 'Waiting for players';
       const orderEl = $('lobby-order');
       if (state.turnOrder && state.turnOrder.length) {
         const seq = state.turnOrder.map((i) => {
@@ -907,12 +939,48 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
         orderEl.innerHTML = `<div class="order-label">Starting turn order — rotates each round</div><div class="order-row">${seq}</div>`;
         orderEl.classList.remove('hidden');
       }
-      $('btn-start').classList.toggle('hidden', !allIn);
+      $('btn-start').classList.toggle('hidden', !(allIn && isHost));
+      $('lobby-wait-host').classList.toggle('hidden', !(allIn && !isHost));
     } else {
       $('lobby-title').textContent = 'Waiting for players';
       $('lobby-order').classList.add('hidden');
       $('btn-start').classList.add('hidden');
+      $('lobby-wait-host').classList.add('hidden');
     }
+  }
+
+  // ---------- pre-draft countdown ----------
+  let countdownScreenTimer = null;
+  function stopCountdownScreen() {
+    if (countdownScreenTimer) { clearInterval(countdownScreenTimer); countdownScreenTimer = null; }
+  }
+  function renderCountdownScreen() {
+    show('screen-countdown');
+    if (state.state !== 'countdown' || !state.countdownEnd) return;
+    const offset = state.serverNow - Date.now();
+    const num = $('countdown-num');
+    function tick() {
+      if (!state || state.state !== 'countdown') { stopCountdownScreen(); return; }
+      const ms = Math.max(0, state.countdownEnd - (Date.now() + offset));
+      const n = Math.ceil(ms / 1000);
+      const label = n > 0 ? String(n) : 'GO!';
+      if (num.textContent !== label) {
+        num.textContent = label;
+        if (n > 0) SFX.count();
+        else SFX.go();
+      }
+      if (ms <= 0) return;
+    }
+    tick();
+    stopCountdownScreen();
+    countdownScreenTimer = setInterval(tick, 100);
+  }
+
+  // ---------- game ended ----------
+  function renderEnded() {
+    show('screen-ended');
+    const name = state.endedBy || 'A player';
+    $('ended-msg').innerHTML = `<b>${esc(name)}</b> disconnected — the game has ended.`;
   }
 
   function renderTurnBanner() {
@@ -1300,5 +1368,5 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   }
   })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33569c55fb06131',t:'MTc4ODEwOTg3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3357f2d6e209337',t:'MTc4ODExMDc0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
