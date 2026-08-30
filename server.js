@@ -52,6 +52,11 @@ function shuffle(arr) {
   return a;
 }
 
+function rotateLeft(arr) {
+  if (arr.length <= 1) return arr.slice();
+  return arr.slice(1).concat(arr[0]);
+}
+
 function pickRevealed() {
   return shuffle(STAT_KEYS).slice(0, 2);
 }
@@ -84,7 +89,6 @@ function createRoom(playerId, name, numPlayers) {
     players: Array(numPlayers).fill(null),
     state: 'waiting', // waiting | lobby | auction | reveal | done
     turnOrder: [],
-    orderPos: 0,
     nextPos: 0,
     roster: [],
     currentIndex: 0,
@@ -112,13 +116,17 @@ function clearTurnTimer(room) { if (room.turnTimer) { clearTimeout(room.turnTime
 function clearRevealTimer(room) { if (room.revealTimer) { clearTimeout(room.revealTimer); room.revealTimer = null; } }
 
 function buildView(room, playerIndex) {
-  const pokemon = room.roster.map((p) => {
+  const pokemon = room.roster.map((p, i) => {
     if (p.won) return { id: p.id, name: p.name, types: p.types, base: p.base, won: p.won };
-    return {
-      id: p.id, name: p.name, types: p.types,
-      revealed: p.revealedStats.map((k) => ({ key: k, label: STAT_LABELS[k], value: p.base[k] })),
-      won: null,
-    };
+    // Only the Pokémon currently on auction reveals its two stats.
+    // Everything else is fully hidden until someone wins it.
+    if (i === room.currentIndex && room.state === 'auction') {
+      return {
+        revealed: p.revealedStats.map((k) => ({ key: k, label: STAT_LABELS[k], value: p.base[k] })),
+        won: null,
+      };
+    }
+    return { won: null, hidden: true };
   });
   return {
     state: room.state,
@@ -204,8 +212,17 @@ function setTurnTimer(room) {
   room.deadline = Date.now() + TURN_SECONDS * 1000;
   room.turnTimer = setTimeout(() => {
     if (room.state !== 'auction' || room.toAct !== actor) return;
-    room.folded[actor] = true; // timeout = fold (bid nothing, forfeit the mon)
-    if (!resolveAuction(room)) advanceTurn(room);
+    if (room.currentBidder === null && room.currentBid === 0) {
+      // Opening bidder must bid — auto-bid the $1 minimum on timeout.
+      room.currentBid = 1;
+      room.currentBidder = actor;
+      touch(room);
+      advanceTurn(room);
+    } else {
+      room.folded[actor] = true; // timeout = fold (bid nothing, forfeit the mon)
+      touch(room);
+      if (!resolveAuction(room)) advanceTurn(room);
+    }
     broadcast(room);
   }, TURN_SECONDS * 1000);
 }
@@ -237,7 +254,7 @@ function beginAuction(room) {
   room.currentBid = 0;
   room.currentBidder = null;
   room.folded = Array(room.numPlayers).fill(false);
-  room.nextPos = room.orderPos;
+  room.nextPos = 0;
   room.toAct = null;
   room.deadline = null;
   room.state = 'auction';
@@ -251,7 +268,6 @@ function startAuction(room) {
   room.currentBidder = null;
   room.budgets = Array(room.numPlayers).fill(BUDGET);
   room.teams = Array.from({ length: room.numPlayers }, () => []);
-  room.orderPos = 0;
   room.lastWinner = null;
   room.lastAward = null;
   beginAuction(room);
@@ -275,7 +291,9 @@ function nextAuction(room) {
     room.state = 'done';
     return;
   }
-  room.orderPos = (room.orderPos + 1) % room.numPlayers;
+  // Rotate the turn order one step forward each round, e.g.
+  // (B, C, A, D) -> (C, A, D, B) -> (A, D, B, C) -> ...
+  room.turnOrder = rotateLeft(room.turnOrder);
   beginAuction(room);
 }
 
@@ -377,6 +395,10 @@ io.on('connection', (socket) => {
     const room = rooms.get(code);
     if (!room || room.state !== 'auction') return;
     if (idx !== room.toAct) { socket.emit('error', 'Not your turn.'); return; }
+    if (room.currentBidder === null && room.currentBid === 0) {
+      socket.emit('error', 'You must open the bidding with a bid.');
+      return;
+    }
     room.folded[idx] = true;
     touch(room);
     if (!resolveAuction(room)) advanceTurn(room);
