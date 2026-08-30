@@ -94,7 +94,6 @@ input:focus { border-color: var(--orange); }
   border-color: var(--orange-2); color: #fff; transform: translateY(-1px);
   outline: 2px solid var(--orange); outline-offset: 2px;
 }
-.seg-btn.active::before { content: "✓ "; color: #fff; }
 
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
@@ -141,7 +140,7 @@ input:focus { border-color: var(--orange); }
 .order-arrow { color: var(--orange); font-weight: 800; }
 
 /* topbar + tabs */
-.topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 12px 22px; background: rgba(18,16,14,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 10px; }
+.topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 12px 22px 12px 120px; background: rgba(18,16,14,.92); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 10px; }
 .brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
 .code-pill { font-size: 12px; font-weight: 800; color: var(--amber); background: var(--panel2); border: 1px solid var(--line); padding: 4px 9px; border-radius: 8px; letter-spacing: 1px; }
 .tabs { display: flex; gap: 6px; }
@@ -316,6 +315,22 @@ input:focus { border-color: var(--orange); }
 .action-popup .ap-type { color: var(--orange-2); font-weight: 800; }
 .action-popup.fold .ap-type { color: var(--muted); }
 
+/* now-playing popup */
+.now-playing {
+  position: fixed; left: 16px; bottom: 18px; z-index: 55;
+  max-width: calc(100vw - 32px);
+  padding: 9px 15px; border-radius: 999px;
+  background: var(--panel-solid); border: 1px solid var(--line);
+  font-size: 13px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: 0 8px 26px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity .3s ease, transform .3s ease;
+  transform: translateY(8px);
+}
+.now-playing.show { opacity: 1; transform: translateY(0); }
+.now-playing .np-label { color: var(--muted); font-weight: 600; }
+.now-playing .np-name { color: var(--amber); font-weight: 800; }
+
 /* fixed bottom action bar (bid controls float above content) */
 .action-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
@@ -349,9 +364,9 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 .no-server h2 { font-size: 22px; margin-bottom: 10px; }
 .no-server p { color: var(--muted); line-height: 1.55; }
 
-.mute-btn { position: fixed; bottom: 16px; right: 16px; z-index: 60; width: 44px; height: 44px; border-radius: 50%; background: var(--panel2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.mute-btn { position: fixed; top: 14px; left: 16px; z-index: 60; width: 44px; height: 44px; border-radius: 50%; background: var(--panel2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
 .mute-btn:hover { filter: brightness(1.2); }
-.music-btn { right: 68px; }
+.music-btn { left: 68px; }
 .music-btn.off { opacity: .5; }
 
 /* pool modal */
@@ -373,6 +388,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 <body>
   <div id="toast" class="toast"></div>
   <div id="action-popup" class="action-popup"></div>
+  <div id="now-playing" class="now-playing"></div>
   <div id="conn" class="conn">Connecting…</div>
   <button id="mute-btn" class="mute-btn" title="Toggle sound effects">🔊</button>
   <button id="music-btn" class="mute-btn music-btn" title="Toggle music">🎵</button>
@@ -634,7 +650,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   });
 
   // ---------- background music (playlist + crossfade) ----------
-  const BGM_FILES = ['/music/bgm1.mp3', '/music/bgm2.mp3', '/music/bgm3.mp3'];
+  // BGM_FILES is populated from the server's /music listing, so dropping any
+  // new mp3/ogg/m4a/wav/aac into public/music/ is picked up automatically.
+  let BGM_FILES = [];
+  let bgmLoaded = false;
   const BGM_VOL = 0.15;
   const CROSSFADE = 3.0;
 
@@ -642,6 +661,24 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   let musicStarted = false;
   let trackA = null, trackB = null;
   let active = null;
+  let nowPlayingTimer = null;
+
+  function songName(url) {
+    let f = '';
+    try { f = decodeURIComponent(String(url).split('/').pop() || ''); } catch (e) { f = String(url); }
+    f = f.replace(/\.[^.]+$/, '');      // strip extension
+    f = f.replace(/[_-]+/g, ' ');        // separators → spaces
+    f = f.replace(/\s+/g, ' ').trim();
+    if (!f) return 'Unknown';
+    return f.replace(/\b[a-z]/g, (c) => c.toUpperCase());
+  }
+  function showNowPlaying(name) {
+    const el = $('now-playing');
+    el.innerHTML = `<span class="np-label">Now playing</span> <span class="np-name">${esc(name)}</span>`;
+    el.classList.add('show');
+    clearTimeout(nowPlayingTimer);
+    nowPlayingTimer = setTimeout(() => el.classList.remove('show'), 3500);
+  }
 
   function updateMusicIcon() {
     $('music-btn').classList.toggle('off', !musicOn);
@@ -665,6 +702,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   }
   function scheduleCrossfade(el, idx) {
     el.onended = null;
+    if (BGM_FILES.length <= 1) { el.loop = true; return; }
     const onUpdate = () => {
       if (!el.duration || el.currentTime < el.duration - CROSSFADE) return;
       el.removeEventListener('timeupdate', onUpdate);
@@ -678,6 +716,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   function playInto(el, idx, fadingOut) {
     el.src = BGM_FILES[idx];
     el.volume = 0;
+    showNowPlaying(songName(BGM_FILES[idx]));
     const p = el.play();
     if (p && p.catch) p.catch(() => {});
     ramp(el, BGM_VOL, CROSSFADE * 1000);
@@ -685,19 +724,35 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     active = el;
     scheduleCrossfade(el, idx);
   }
+  async function loadBgm() {
+    if (bgmLoaded) return;
+    bgmLoaded = true;
+    try {
+      const res = await fetch('/music');
+      if (res.ok) {
+        const list = await res.json();
+        if (Array.isArray(list) && list.length) BGM_FILES = list;
+      }
+    } catch (e) {}
+  }
   function startMusic() {
     if (!musicOn || musicStarted) return;
     musicStarted = true;
-    trackA = newTrack();
-    trackB = newTrack();
-    const start = Math.floor(Math.random() * BGM_FILES.length);
-    trackA.src = BGM_FILES[start];
-    trackA.volume = 0;
-    const p = trackA.play();
-    if (p && p.catch) p.catch(() => {});
-    ramp(trackA, BGM_VOL, 1200);
-    active = trackA;
-    scheduleCrossfade(trackA, start);
+    loadBgm().then(() => {
+      if (!musicStarted || !musicOn) return;
+      if (!BGM_FILES.length) return; // no music files yet — stay silent
+      trackA = newTrack();
+      trackB = newTrack();
+      const start = Math.floor(Math.random() * BGM_FILES.length);
+      trackA.src = BGM_FILES[start];
+      trackA.volume = 0;
+      showNowPlaying(songName(BGM_FILES[start]));
+      const p = trackA.play();
+      if (p && p.catch) p.catch(() => {});
+      ramp(trackA, BGM_VOL, 1200);
+      active = trackA;
+      scheduleCrossfade(trackA, start);
+    });
   }
   function stopMusic() {
     [trackA, trackB].forEach((t) => { if (t) { try { t.pause(); } catch (e) {} } });
@@ -971,6 +1026,8 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       </div>
     `;
     bindBidControls(lo, hi, canBid);
+    const bidBtn = bar.querySelector('#btn-bid');
+    if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid && socket) socket.emit('bid', bidValue); });
     const foldBtn = bar.querySelector('#btn-fold');
     if (foldBtn) foldBtn.addEventListener('click', () => { if (socket) socket.emit('fold'); });
   }
@@ -1177,8 +1234,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       <div class="export-actions" style="grid-column:1/-1">
         <button class="btn primary" id="btn-copy-team">Copy my team</button>
         <button class="btn primary" id="btn-download-team">Download my team</button>
+        <button class="btn" id="btn-back-home">Back to main menu</button>
       </div>`;
 
+    $('btn-back-home').addEventListener('click', () => { if (socket) socket.disconnect(); location.reload(); });
     $('btn-copy-team').addEventListener('click', () => {
       const text = teamText();
       navigator.clipboard.writeText(text).then(() => toast('Team copied!')).catch(() => prompt('Copy:', text));
@@ -1241,5 +1300,5 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   }
   })();
   </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33569c55fb06131',t:'MTc4ODEwOTg3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
