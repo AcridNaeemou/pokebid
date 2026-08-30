@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: pokebid
+    runtime: node
+    plan: free
+    buildCommand: "npm install"
+    startCommand: "npm start"
+    healthCheckPath: /healthz
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: 10000
+      - key: TURN_SECONDS
+        value: "30"
+      - key: REVEAL_SECONDS
+        value: "4"

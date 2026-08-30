@@ -1,0 +1,1044 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PokéBid — Blind Bid Teambuilder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
+<style>
+:root {
+  --bg: #12100e;
+  --panel: rgba(30, 27, 24, 0.72);
+  --panel-solid: #201c18;
+  --panel2: #2a251f;
+  --line: #3a332b;
+  --text: #f4efe7;
+  --muted: #a89c8e;
+  --orange: #ff7a1a;
+  --orange-2: #ff9a45;
+  --orange-deep: #e85f04;
+  --amber: #ffc94d;
+  --green: #5fd97a;
+  --red: #ff5a4d;
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; color: var(--text);
+  font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  min-height: 100vh;
+  background: linear-gradient(180deg, #191512 0%, var(--bg) 45%, #0e0c0a 100%);
+  background-attachment: fixed;
+}
+.screen { min-height: 100vh; padding: 24px 16px; }
+.center { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 20px; text-align: center; }
+.hidden { display: none !important; }
+.panel {
+  background: var(--panel); border: 1px solid var(--line); border-radius: 18px; padding: 24px;
+  backdrop-filter: blur(10px); box-shadow: 0 18px 50px rgba(0,0,0,.4);
+}
+.card { width: 100%; max-width: 440px; display: flex; flex-direction: column; gap: 16px; }
+.muted { color: var(--muted); font-size: 14px; }
+.muted b, .muted strong { color: var(--text); }
+
+h1 {
+  margin: 0; font-size: 56px; font-weight: 900; letter-spacing: 1px; line-height: 1;
+  background: linear-gradient(180deg, #ffe3c2, var(--orange-2) 55%, var(--orange-deep));
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+h2 { margin: 0 0 4px; font-weight: 800; }
+
+.pokeball {
+  width: 84px; height: 84px; border-radius: 50%;
+  background: linear-gradient(to bottom, #ff6b2b 0 46%, #1a130c 46% 54%, #f4efe7 54% 100%);
+  border: 4px solid #1a130c; position: relative; margin: 0 auto 12px;
+  box-shadow: 0 14px 30px rgba(0,0,0,.45);
+  animation: floaty 3.4s ease-in-out infinite;
+}
+.pokeball::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+  width: 24px; height: 24px; border-radius: 50%; background: #f4efe7; border: 5px solid #1a130c;
+}
+.pokeball.small { width: 26px; height: 26px; border-width: 2px; margin: 0; box-shadow: none; animation: none; }
+.pokeball.small::after { width: 8px; height: 8px; border-width: 2px; }
+@keyframes floaty { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-9px); } }
+
+.welcome { color: var(--muted); max-width: 430px; font-size: 15px; line-height: 1.55; }
+.welcome b { color: var(--orange-2); }
+
+.rules { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; text-align: left; width: 100%; }
+.rule { display: flex; gap: 10px; align-items: flex-start; font-size: 13px; color: var(--muted); }
+.rule .ico { flex: none; width: 22px; height: 22px; border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; background: var(--panel2); border: 1px solid var(--line); }
+.pool-note { font-size: 13px; color: var(--muted); max-width: 460px; line-height: 1.5; }
+.pool-note b { color: var(--orange-2); }
+
+label { display: flex; flex-direction: column; gap: 7px; font-size: 13px; color: var(--muted); text-align: left; font-weight: 600; }
+input {
+  background: var(--panel2); border: 1px solid var(--line); color: var(--text);
+  border-radius: 12px; padding: 13px 15px; font-size: 16px; outline: none; font-family: inherit;
+}
+input:focus { border-color: var(--orange); }
+
+.field { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.field-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.seg { display: grid; grid-auto-flow: column; gap: 8px; }
+.seg-btn {
+  padding: 12px; font-size: 16px; font-weight: 800; border-radius: 11px; cursor: pointer;
+  background: var(--panel2); border: 2px solid var(--line); color: var(--muted); font-family: inherit;
+  transition: all .12s ease;
+}
+.seg-btn:hover { color: var(--text); border-color: var(--muted); }
+.seg-btn.active {
+  background: linear-gradient(180deg, var(--orange-2), var(--orange-deep));
+  border-color: var(--orange-2); color: #fff; transform: translateY(-1px);
+  outline: 2px solid var(--orange); outline-offset: 2px;
+}
+.seg-btn.active::before { content: "✓ "; color: #fff; }
+
+.divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
+.divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
+.row { display: flex; align-items: center; }
+.gap { gap: 10px; }
+.code-input { text-transform: uppercase; letter-spacing: 3px; font-weight: 800; width: 120px; text-align: center; font-size: 18px; }
+
+/* buttons */
+.btn {
+  border: none; border-radius: 14px; padding: 14px 20px; font-size: 15px; font-weight: 800;
+  cursor: pointer; color: var(--text); font-family: inherit;
+  background: var(--panel2); border: 1px solid var(--line);
+  box-shadow: 0 4px 14px rgba(0,0,0,.3);
+  transition: transform .08s ease, box-shadow .15s ease, filter .15s ease;
+}
+.btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+.btn:active { transform: translateY(1px) scale(.98); }
+.btn.primary {
+  background: linear-gradient(180deg, #ffb25e, var(--orange-2) 40%, var(--orange-deep));
+  border-color: var(--orange-2); color: #fff;
+}
+.btn.ghost { background: transparent; box-shadow: none; }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.big { font-size: 17px; padding: 16px; }
+.bid-btn { font-size: 16px; font-weight: 800; padding: 13px 14px; }
+
+.big-code {
+  font-size: 52px; font-weight: 900; letter-spacing: 12px; color: var(--amber);
+  background: var(--panel2); border: 1px dashed var(--line); border-radius: 16px; padding: 14px 22px;
+}
+
+/* lobby */
+.lobby { max-width: 470px; }
+.lobby-slots { display: flex; flex-direction: column; gap: 8px; }
+.lobby-slot { display: flex; align-items: center; gap: 10px; padding: 11px 14px; border-radius: 12px; background: var(--panel2); border: 1px solid var(--line); text-align: left; }
+.lobby-slot .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); flex: none; }
+.lobby-slot.filled .dot { background: var(--green); }
+.lobby-slot .ls-name { font-weight: 700; }
+.lobby-slot .ls-you { font-size: 11px; color: var(--orange); font-weight: 700; margin-left: 4px; }
+.lobby-slot .ls-wait { color: var(--muted); font-size: 13px; }
+.lobby-order { width: 100%; margin-top: 4px; }
+.order-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.order-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.order-pill { padding: 7px 14px; border-radius: 999px; background: var(--panel2); border: 2px solid var(--line); font-weight: 700; font-size: 14px; }
+.order-arrow { color: var(--orange); font-weight: 800; }
+
+/* topbar */
+.topbar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; padding: 12px 22px; background: rgba(18,16,14,.9); backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); flex-wrap: wrap; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 800; font-size: 19px; }
+.code-pill { font-size: 12px; font-weight: 800; color: var(--amber); background: var(--panel2); border: 1px solid var(--line); padding: 4px 9px; border-radius: 8px; letter-spacing: 1px; }
+.players-bar { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.player-pill { display: flex; align-items: center; gap: 8px; padding: 7px 13px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); font-size: 13px; transition: all .15s ease; }
+.player-pill .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--green); flex: none; }
+.player-pill .dot.off { background: var(--muted); }
+.player-pill.turn { border-color: var(--amber); background: rgba(255,201,77,.12); }
+.player-pill b { font-weight: 700; }
+.player-pill .sub { color: var(--muted); font-size: 11px; }
+
+/* turn banner */
+.turn-banner {
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 10px 16px; border-radius: 12px; font-weight: 800; font-size: 15px;
+  background: var(--panel-solid); border: 1px solid var(--line);
+  margin: 14px 22px 0;
+}
+.turn-banner .dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.turn-banner.my { border-color: var(--amber); background: var(--amber); color: #3a2500; }
+.turn-banner.my .dot { background: #3a2500; }
+
+.layout { display: grid; grid-template-columns: 1fr 380px; gap: 18px; padding: 16px 22px 18px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: 1fr; } }
+.section-title { font-weight: 800; margin-bottom: 12px; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+
+.card-slot { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; position: relative; transition: border-color .15s ease; }
+.card-slot .art { width: 100%; aspect-ratio: 1/1; background: radial-gradient(circle at 50% 42%, #33291f, #1b1611); display: flex; align-items: center; justify-content: center; }
+.card-slot .art img { width: 84%; height: 84%; object-fit: contain; }
+.card-slot .name { font-weight: 800; font-size: 15px; padding: 4px 8px 2px; text-align: center; }
+.card-slot .types { display: flex; gap: 5px; justify-content: center; padding: 0 8px 4px; flex-wrap: wrap; }
+.type-chip { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; color: #fff; }
+.card-slot .stats { display: flex; flex-direction: column; gap: 4px; padding: 6px 10px 12px; }
+.stat-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+.stat-row .lbl { color: var(--muted); }
+.stat-row .val { font-weight: 800; font-variant-numeric: tabular-nums; color: var(--orange-2); }
+.stat-bar { height: 6px; border-radius: 3px; background: var(--panel2); overflow: hidden; }
+.stat-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--orange-deep), var(--amber)); border-radius: 3px; }
+.card-slot .owned-banner { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.7); color: #fff; font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 8px; }
+.card-slot .hidden-mark { position: absolute; top: 8px; left: 8px; background: rgba(0,0,0,.6); color: var(--muted); font-size: 10px; font-weight: 700; padding: 3px 7px; border-radius: 8px; letter-spacing: .5px; }
+
+/* auction panel */
+#auction-panel { display: flex; flex-direction: column; gap: 13px; }
+.auction-title { font-size: 13px; font-weight: 700; color: var(--muted); letter-spacing: .5px; text-transform: uppercase; }
+.auction-name { font-size: 30px; font-weight: 900; line-height: 1.05; }
+.auction-types { display: flex; gap: 6px; flex-wrap: wrap; }
+.auction-stats { display: flex; flex-direction: column; gap: 8px; margin: 2px 0; }
+.bid-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.status-line { font-size: 13px; color: var(--muted); }
+.status-line b { color: var(--text); }
+.highlight { color: var(--amber); font-weight: 800; }
+.winner-line { font-size: 13px; color: var(--muted); }
+.turn-badge { align-self: flex-start; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+.turn-badge.my-turn { background: rgba(255,201,77,.15); border-color: var(--amber); color: var(--amber); }
+.in-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.in-chip { font-size: 11px; font-weight: 700; padding: 3px 9px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
+.in-chip.out { opacity: .45; text-decoration: line-through; }
+
+/* countdown */
+.cd-wrap { display: flex; align-items: center; gap: 14px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 12px 16px; }
+.cd-num { font-size: 40px; font-weight: 900; font-variant-numeric: tabular-nums; color: var(--amber); line-height: 1; min-width: 58px; text-align: center; }
+.cd-col { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+.cd-bar { height: 10px; border-radius: 5px; background: var(--panel2); overflow: hidden; }
+.cd-bar > i { display: block; height: 100%; background: linear-gradient(90deg, var(--orange-deep), var(--amber)); transition: width .1s linear; }
+.cd-label { font-size: 12px; color: var(--muted); font-weight: 700; }
+.cd-wrap.warn { border-color: var(--amber); }
+.cd-wrap.danger { border-color: var(--red); animation: pulse-danger .6s ease-in-out infinite; }
+.cd-wrap.danger .cd-num { color: var(--red); }
+.cd-wrap.danger .cd-bar > i { background: linear-gradient(90deg, var(--red), var(--orange-2)); }
+@keyframes pulse-danger { 0%,100% { outline: 2px solid transparent; } 50% { outline: 3px solid rgba(255,90,77,.6); outline-offset: 2px; } }
+
+/* bid wheel */
+.bid-box { display: flex; flex-direction: column; gap: 10px; }
+.wheel-hint { font-size: 11px; color: var(--muted); text-align: center; }
+.bid-wheel { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
+.bid-wheel input { flex: 1; text-align: center; font-size: 30px; font-weight: 900; background: transparent; border: none; outline: none; color: var(--amber); font-variant-numeric: tabular-nums; padding: 4px; }
+.wh-btn { width: 46px; height: 46px; flex: none; border-radius: 11px; font-size: 22px; font-weight: 800; background: var(--panel-solid); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: inherit; transition: filter .1s ease, transform .08s ease; }
+.wh-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
+.wh-btn:active { transform: scale(.95); }
+.bid-range { font-size: 12px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+
+/* team panel */
+.team-panel { display: flex; flex-direction: column; gap: 12px; }
+.team-head { display: flex; justify-content: space-between; align-items: baseline; }
+.team-head .budget { font-weight: 900; font-size: 18px; color: var(--amber); }
+.team-head .budget.zero { color: var(--muted); }
+.team-head .budget.done { color: var(--green); }
+.team-row { display: grid; grid-template-columns: 34px 1fr auto; gap: 10px; align-items: center; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 12px; padding: 8px 10px; }
+.team-row .timg { width: 34px; height: 34px; object-fit: contain; background: var(--panel2); border-radius: 8px; }
+.team-row .tname { font-weight: 700; font-size: 14px; }
+.team-row .tmeta { color: var(--muted); font-size: 12px; }
+.team-row .tprice { font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
+.empty-slot { color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 12px; padding: 10px; text-align: center; }
+
+/* done screen */
+.done-teams { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 18px; padding: 0 22px 40px; max-width: 1000px; margin: 0 auto; }
+.done-team { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; padding: 18px; }
+.done-team h3 { margin: 0 0 12px; font-size: 20px; font-weight: 800; }
+.done-card { display: grid; grid-template-columns: 44px 1fr; gap: 10px; align-items: center; padding: 8px 0; border-top: 1px solid var(--line); }
+.done-card img { width: 44px; height: 44px; object-fit: contain; background: var(--panel2); border-radius: 8px; }
+.done-card .dc-name { font-weight: 700; }
+.done-card .dc-types { display: flex; gap: 4px; flex-wrap: wrap; }
+
+/* reveal overlay */
+.reveal { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: rgba(10,8,6,.82); backdrop-filter: blur(6px); padding: 20px; }
+.reveal.hidden { display: none; }
+.reveal-card { position: relative; width: 100%; max-width: 420px; text-align: center; padding: 34px 26px 28px; background: linear-gradient(180deg, var(--panel-solid), #181310); border: 1px solid var(--line); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.6); overflow: hidden; animation: pop-in .35s cubic-bezier(.2,1.4,.4,1); }
+@keyframes pop-in { from { transform: scale(.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.reveal-sparkles { position: absolute; inset: 0; pointer-events: none; }
+.reveal-sparkles span { position: absolute; border-radius: 50%; animation: sparkle 1.2s ease-out forwards; }
+@keyframes sparkle { 0% { transform: translateY(0) scale(1); opacity: 1; } 100% { transform: translateY(-120px) scale(0); opacity: 0; } }
+.reveal-art { width: 180px; height: 180px; margin: 0 auto; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: radial-gradient(circle at 50% 40%, #33291f, #1b1611); }
+.reveal-art img { width: 88%; height: 88%; object-fit: contain; animation: bob 1.6s ease-in-out infinite; }
+@keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+.reveal-title { font-size: 15px; font-weight: 800; letter-spacing: 3px; text-transform: uppercase; margin: 18px 0 4px; }
+.reveal-name { font-size: 22px; font-weight: 800; }
+.reveal-name .rn-poke { color: var(--amber); }
+.reveal-types { display: flex; gap: 6px; justify-content: center; margin: 10px 0 14px; flex-wrap: wrap; }
+.reveal-stats { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; margin-bottom: 12px; }
+.rv-stat { background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 8px 4px; }
+.rv-stat span { display: block; color: var(--muted); font-size: 10px; }
+.rv-stat b { font-size: 16px; font-weight: 800; color: var(--orange-2); }
+.reveal-price { color: var(--amber); font-weight: 800; font-size: 15px; }
+
+.toast { position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(20px); background: var(--panel2); border: 1px solid var(--line); color: var(--text); padding: 12px 18px; border-radius: 12px; font-size: 14px; opacity: 0; pointer-events: none; transition: all .25s ease; z-index: 50; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { border-color: var(--orange); color: #ffc2a1; }
+
+.conn { position: fixed; top: 14px; right: 16px; z-index: 60; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--amber); display: flex; align-items: center; gap: 7px; pointer-events: none; }
+.conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: pulse 1.2s infinite; }
+.conn.ok { color: var(--green); border-color: var(--green); opacity: 0; transition: opacity .4s ease .8s; }
+.conn.ok::before { background: var(--green); animation: none; }
+.conn.err { color: #ffb4b4; border-color: var(--orange); }
+.conn.err::before { background: var(--orange); animation: none; }
+@keyframes pulse { 0% { opacity: 1; } 50% { opacity: .35; } 100% { opacity: 1; } }
+
+.no-server { position: fixed; inset: 0; z-index: 200; background: rgba(18,16,14,.97); display: flex; align-items: center; justify-content: center; padding: 24px; text-align: center; }
+.no-server .ns-card { max-width: 420px; }
+.no-server h2 { font-size: 22px; margin-bottom: 10px; }
+.no-server p { color: var(--muted); line-height: 1.55; }
+
+.mute-btn { position: fixed; bottom: 16px; right: 16px; z-index: 60; width: 44px; height: 44px; border-radius: 50%; background: var(--panel2); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-size: 18px; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 14px rgba(0,0,0,.4); }
+.mute-btn:hover { filter: brightness(1.2); }
+
+/* pool modal */
+.pool-overlay { position: fixed; inset: 0; z-index: 150; background: rgba(10,8,6,.85); backdrop-filter: blur(5px); display: flex; align-items: center; justify-content: center; padding: 20px; }
+.pool-overlay.hidden { display: none; }
+.pool-card { width: 100%; max-width: 860px; max-height: 86vh; display: flex; flex-direction: column; gap: 14px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 18px; padding: 20px; box-shadow: 0 30px 80px rgba(0,0,0,.6); }
+.pool-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.pool-head h2 { font-size: 20px; margin: 0; }
+.pool-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; overflow-y: auto; padding-right: 4px; }
+.pool-item { display: flex; flex-direction: column; align-items: center; gap: 4px; background: var(--panel2); border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px; }
+.pool-item img { width: 56px; height: 56px; object-fit: contain; }
+.pool-item .pi-name { font-size: 12px; font-weight: 700; text-align: center; line-height: 1.1; }
+.pool-item .pi-types { display: flex; gap: 3px; flex-wrap: wrap; justify-content: center; }
+.pool-item .type-chip { font-size: 9px; padding: 1px 6px; }
+
+.export-actions { display: flex; gap: 10px; justify-content: center; padding: 0 22px 30px; flex-wrap: wrap; }
+</style>
+</head>
+<body>
+  <div id="toast" class="toast"></div>
+  <div id="conn" class="conn">Connecting…</div>
+  <button id="mute-btn" class="mute-btn" title="Toggle sound">🔊</button>
+  <div id="no-server" class="no-server hidden">
+    <div class="ns-card">
+      <div class="pokeball" style="width:60px;height:60px"></div>
+      <h2>Not connected to the game server</h2>
+      <p>This looks like a <b>static preview</b> of the page. The real game runs on a live server — open the <b>live preview</b> link (the running PokéBid server) in your browser to play.</p>
+      <p class="muted">If you're seeing this on the live preview, the server may have paused — just tell me and I'll restart it.</p>
+    </div>
+  </div>
+
+  <!-- LANDING -->
+  <div id="screen-landing" class="screen center">
+    <div class="logo-wrap">
+      <div class="pokeball"></div>
+      <h1>PokéBid</h1>
+      <p class="welcome"><b>Welcome!</b> Draft a team of <b>6 Pokémon</b> with a <b>$30</b> budget. Every Pokémon hides its stats, and you only ever see <b>two random stats</b> before you bid. Bid blind and gamble on greatness.</p>
+    </div>
+    <div class="card panel">
+      <div class="rules">
+        <div class="rule"><span class="ico">👥</span> 2–5 players · 6 Pokémon each · $30 budget</div>
+        <div class="rule"><span class="ico">👁️</span> Only two random stats revealed per Pokémon</div>
+        <div class="rule"><span class="ico">⏱️</span> 30-second bid timer — bid, or fold to skip</div>
+        <div class="rule"><span class="ico">💰</span> Losing bids cost nothing — only the winner pays</div>
+      </div>
+    </div>
+    <div class="card panel">
+      <label>Your name
+        <input id="name-input" type="text" maxlength="20" placeholder="e.g. Ash" />
+      </label>
+      <div class="field">
+        <div class="field-label">Players (2–5)</div>
+        <div class="seg" id="count-seg">
+          <button type="button" class="seg-btn active" data-n="2">2</button>
+          <button type="button" class="seg-btn" data-n="3">3</button>
+          <button type="button" class="seg-btn" data-n="4">4</button>
+          <button type="button" class="seg-btn" data-n="5">5</button>
+        </div>
+      </div>
+      <button type="button" id="btn-create" class="btn primary big">Create game</button>
+      <div class="divider"><span>or join a room</span></div>
+      <div class="row gap">
+        <input id="code-input" type="text" maxlength="4" placeholder="CODE" class="code-input" />
+        <button type="button" id="btn-join" class="btn primary">Join</button>
+      </div>
+    </div>
+    <p class="pool-note">For competitive play, only <b>battle-ready Pokémon</b> are included: VGC World Champion teams, in-game Champion teams like Blue and Cynthia, and special boss teams like Red's and Zinnia's.</p>
+    <button type="button" id="btn-view-pool" class="btn primary">See all available Pokémon</button>
+  </div>
+
+  <!-- LOBBY -->
+  <div id="screen-lobby" class="screen center hidden">
+    <div class="card panel lobby">
+      <h2 id="lobby-title">Waiting for players</h2>
+      <p class="muted">Share the code — the draft starts when everyone's in.</p>
+      <div class="big-code" id="lobby-code">—-</div>
+      <div id="lobby-slots" class="lobby-slots"></div>
+      <div id="lobby-order" class="lobby-order hidden"></div>
+      <button type="button" id="btn-start" class="btn primary hidden">Start draft</button>
+      <button type="button" id="btn-copy-link" class="btn primary">Copy invite link</button>
+      <button type="button" id="btn-leave" class="btn ghost">Leave room</button>
+    </div>
+  </div>
+
+  <!-- GAME -->
+  <div id="screen-game" class="screen hidden">
+    <header class="topbar">
+      <div class="brand"><span class="pokeball small"></span> PokéBid <span class="code-pill" id="game-code"></span></div>
+      <div class="players-bar" id="players-bar"></div>
+    </header>
+    <div id="turn-banner" class="turn-banner hidden"></div>
+    <main class="layout">
+      <section class="board-panel">
+        <div class="section-title">Draft board</div>
+        <div id="board" class="board"></div>
+      </section>
+      <aside class="side">
+        <div id="auction-panel" class="card panel"></div>
+        <div id="team-panel" class="team-panel"></div>
+      </aside>
+    </main>
+  </div>
+
+  <!-- DONE -->
+  <div id="screen-done" class="screen hidden">
+    <div class="done-head center">
+      <h1>Draft complete!</h1>
+      <p class="muted">Here's what everyone drafted.</p>
+    </div>
+    <div id="done-teams" class="done-teams"></div>
+  </div>
+
+  <!-- REVEAL OVERLAY -->
+  <div id="reveal" class="reveal hidden">
+    <div class="reveal-card">
+      <div id="reveal-sparkles" class="reveal-sparkles"></div>
+      <div class="reveal-art"><img id="reveal-img" alt="" /></div>
+      <div id="reveal-title" class="reveal-title"></div>
+      <div id="reveal-name" class="reveal-name"></div>
+      <div id="reveal-types" class="reveal-types"></div>
+      <div id="reveal-stats" class="reveal-stats"></div>
+      <div id="reveal-price" class="reveal-price"></div>
+    </div>
+  </div>
+
+  <!-- POOL MODAL -->
+  <div id="pool-overlay" class="pool-overlay hidden">
+    <div class="pool-card">
+      <div class="pool-head">
+        <h2>Available Pokémon <span id="pool-count"></span></h2>
+        <button type="button" class="btn" id="pool-close">Close</button>
+      </div>
+      <input id="pool-search" type="text" placeholder="Search a Pokémon…" />
+      <div id="pool-grid" class="pool-grid"></div>
+    </div>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+  (function () {
+  const HAS_SOCKET = typeof io !== 'undefined';
+  const socket = HAS_SOCKET ? io() : null;
+
+  const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
+  const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
+  const TYPE_COLORS = {
+    normal: '#A8A77A', fire: '#EE8130', water: '#6390F0', electric: '#F7D02C',
+    grass: '#7AC74C', ice: '#96D9D6', fighting: '#C22E28', poison: '#A33EA1',
+    ground: '#E2BF65', flying: '#A98FF3', psychic: '#F95587', bug: '#A6B91A',
+    rock: '#B6A136', ghost: '#735797', dragon: '#6F35FC', dark: '#705746',
+    steel: '#B7B7CE', fairy: '#D685AD',
+  };
+  const PLAYER_COLORS = ['#ff7a1a', '#4da3ff', '#5fd97a', '#b78bff', '#ff7ab8'];
+  const ART = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
+
+  let playerId = localStorage.getItem('pokedraft_playerId');
+  if (!playerId) { try { playerId = crypto.randomUUID(); } catch (e) { playerId = 'p' + Math.random().toString(36).slice(2); } localStorage.setItem('pokedraft_playerId', playerId); }
+
+  let state = null;
+  let myIndex = null;
+  let chosenCount = 2;
+  let bidValue = 1;
+  let countdownTimer = null;
+  let warnedThisTurn = false;
+  let poolCache = null;
+
+  const $ = (id) => document.getElementById(id);
+  const screens = ['screen-landing', 'screen-lobby', 'screen-game', 'screen-done'];
+  function show(screen) { screens.forEach((s) => $(s).classList.toggle('hidden', s !== screen)); }
+
+  let toastTimer;
+  function toast(msg, isError) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isError ? ' error' : '');
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => (t.className = 'toast'), 2600);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+  function typeChip(name) {
+    const c = TYPE_COLORS[name.toLowerCase()] || '#888';
+    return `<span class="type-chip" style="background:${c}">${name}</span>`;
+  }
+  function statBar(val) {
+    const pct = Math.min(100, Math.round((val / 180) * 100));
+    return `<div class="stat-bar"><i style="width:${pct}%"></i></div>`;
+  }
+
+  // ---------- sound effects (Web Audio, no files) ----------
+  const SFX = (() => {
+    let ctx = null;
+    let muted = false;
+    function ensure() {
+      if (!ctx) {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        ctx = new AC();
+      }
+      if (ctx.state === 'suspended') ctx.resume();
+      return ctx;
+    }
+    function tone(f0, f1, dur, vol, type = 'sine', delay = 0) {
+      if (muted) return;
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime + delay;
+      const o = c.createOscillator();
+      const g = c.createGain();
+      o.type = type;
+      o.frequency.setValueAtTime(f0, t);
+      if (f1 && f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+      g.gain.setValueAtTime(vol, t);
+      g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+      o.connect(g); g.connect(c.destination);
+      o.start(t); o.stop(t + dur + 0.03);
+    }
+    return {
+      pop: () => tone(340, 680, 0.09, 0.10),
+      hover: () => tone(240, 280, 0.045, 0.028),
+      bid: () => { tone(440, 440, 0.07, 0.09); tone(660, 660, 0.08, 0.08, 'sine', 0.06); },
+      fold: () => tone(300, 180, 0.12, 0.09),
+      warn: () => { tone(660, 660, 0.12, 0.09, 'square'); tone(660, 660, 0.12, 0.09, 'square', 0.18); },
+      win: () => { tone(523, 523, 0.12, 0.10); tone(659, 659, 0.12, 0.10, 'sine', 0.11); tone(784, 784, 0.22, 0.10, 'sine', 0.22); },
+      unlock: () => { ensure(); },
+      toggleMute() { muted = !muted; return muted; },
+      get muted() { return muted; },
+    };
+  })();
+
+  function updateMuteIcon() { $('mute-btn').textContent = SFX.muted ? '🔇' : '🔊'; }
+  $('mute-btn').addEventListener('click', () => { SFX.toggleMute(); updateMuteIcon(); });
+  document.addEventListener('pointerdown', () => SFX.unlock(), { once: false });
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .card-slot, .mute-btn');
+    if (el && e.relatedTarget && !el.contains(e.relatedTarget)) SFX.hover();
+  });
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('.btn, .seg-btn, .wh-btn');
+    if (el) SFX.pop();
+  });
+
+  // ---------- landing ----------
+  document.querySelectorAll('.seg-btn').forEach((b) => {
+    b.addEventListener('click', () => {
+      chosenCount = parseInt(b.dataset.n, 10);
+      document.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', x === b));
+    });
+  });
+
+  $('btn-create').addEventListener('click', () => {
+    if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
+    const name = $('name-input').value.trim() || 'Player 1';
+    socket.emit('create', { playerId, name, numPlayers: chosenCount }, (res) => {
+      if (!res.ok) return toast(res.error, true);
+      myIndex = res.playerIndex;
+      show('screen-lobby');
+    });
+  });
+  $('btn-join').addEventListener('click', () => {
+    if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
+    const code = $('code-input').value.trim().toUpperCase();
+    if (!code) return toast('Enter a room code.', true);
+    const name = $('name-input').value.trim() || 'Player 2';
+    socket.emit('join', { playerId, name, code }, (res) => {
+      if (!res.ok) return toast(res.error, true);
+      myIndex = res.playerIndex;
+      if (state && (state.state === 'auction' || state.state === 'reveal')) show('screen-game');
+      else show('screen-lobby');
+    });
+  });
+  $('name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-create').click(); });
+  $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-join').click(); });
+
+  $('btn-start').addEventListener('click', () => { if (socket) socket.emit('start'); });
+  $('btn-copy-link').addEventListener('click', async () => {
+    const code = state ? state.code : '----';
+    const url = location.origin + '/?join=' + code;
+    try { await navigator.clipboard.writeText(url); toast('Invite link copied!'); }
+    catch { prompt('Copy this link:', url); }
+  });
+  $('btn-leave').addEventListener('click', () => { if (socket) socket.disconnect(); location.reload(); });
+
+  // ---------- pool modal ----------
+  function renderPool(list, q) {
+    const grid = $('pool-grid');
+    const query = (q || '').trim().toLowerCase();
+    const filtered = query ? list.filter((p) => p.name.toLowerCase().includes(query)) : list;
+    $('pool-count').textContent = `(${list.length})`;
+    if (!filtered.length) {
+      grid.innerHTML = '<p class="muted">No Pokémon match that search.</p>';
+      return;
+    }
+    grid.innerHTML = filtered.map((p) => `
+      <div class="pool-item">
+        <img src="${ART(p.id)}" alt="${esc(p.name)}" loading="lazy" />
+        <div class="pi-name">${esc(p.name)}</div>
+        <div class="pi-types">${p.types.map(typeChip).join('')}</div>
+      </div>`).join('');
+  }
+  async function openPool() {
+    $('pool-overlay').classList.remove('hidden');
+    $('pool-search').value = '';
+    if (poolCache) { renderPool(poolCache, ''); return; }
+    $('pool-grid').innerHTML = '<p class="muted">Loading…</p>';
+    try {
+      const res = await fetch('/pool');
+      if (!res.ok) throw new Error('bad status');
+      poolCache = await res.json();
+      renderPool(poolCache, '');
+    } catch (e) {
+      $('pool-grid').innerHTML = '<p class="muted">Couldn\'t load the pool here — open the live preview to browse all Pokémon.</p>';
+    }
+  }
+  $('btn-view-pool').addEventListener('click', openPool);
+  $('pool-close').addEventListener('click', () => $('pool-overlay').classList.add('hidden'));
+  $('pool-overlay').addEventListener('click', (e) => { if (e.target === $('pool-overlay')) $('pool-overlay').classList.add('hidden'); });
+  $('pool-search').addEventListener('input', (e) => { if (poolCache) renderPool(poolCache, e.target.value); });
+
+  // ---------- render ----------
+  function render() {
+    if (!state) return;
+    if (state.state === 'waiting' || state.state === 'lobby') { renderLobby(); return; }
+    if (state.state === 'done') { hideReveal(); renderDone(); return; }
+    show('screen-game');
+    $('game-code').textContent = state.code;
+    renderPlayers();
+    renderTurnBanner();
+    renderBoard();
+    renderAuction();
+    renderTeam();
+    if (state.state === 'reveal' && state.lastAward) showReveal(state.lastAward);
+    else hideReveal();
+  }
+
+  function renderLobby() {
+    show('screen-lobby');
+    $('lobby-code').textContent = state.code;
+    const wrap = $('lobby-slots');
+    wrap.innerHTML = '';
+    for (let i = 0; i < state.numPlayers; i++) {
+      const pl = state.players[i];
+      const el = document.createElement('div');
+      el.className = 'lobby-slot' + (pl ? ' filled' : '');
+      el.innerHTML = pl
+        ? `<span class="dot"></span><span class="ls-name">${esc(pl.name)}</span>${i === myIndex ? '<span class="ls-you">you</span>' : ''}`
+        : `<span class="dot"></span><span class="ls-wait">Waiting for player ${i + 1}…</span>`;
+      wrap.appendChild(el);
+    }
+
+    const allIn = state.players.every((p) => p && p.connected);
+    if (state.state === 'lobby') {
+      $('lobby-title').textContent = allIn ? 'Everyone\'s here!' : 'Waiting for players';
+      const orderEl = $('lobby-order');
+      if (state.turnOrder && state.turnOrder.length) {
+        const seq = state.turnOrder.map((i) => {
+          const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+          return `<span class="order-pill" style="border-color:${color}">${esc(state.players[i].name)}${i === myIndex ? ' (you)' : ''}</span>`;
+        }).join('<span class="order-arrow">→</span>');
+        orderEl.innerHTML = `<div class="order-label">Turn order</div><div class="order-row">${seq}</div>`;
+        orderEl.classList.remove('hidden');
+      }
+      $('btn-start').classList.toggle('hidden', !allIn);
+    } else {
+      $('lobby-title').textContent = 'Waiting for players';
+      $('lobby-order').classList.add('hidden');
+      $('btn-start').classList.add('hidden');
+    }
+  }
+
+  function renderPlayers() {
+    const bar = $('players-bar');
+    bar.innerHTML = '';
+    for (let i = 0; i < state.numPlayers; i++) {
+      const pl = state.players[i];
+      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const me = i === myIndex;
+      const turn = state.toAct === i;
+      const el = document.createElement('div');
+      el.className = 'player-pill' + (turn ? ' turn' : '');
+      if (me) el.style.borderColor = color;
+      el.innerHTML = `
+        <span class="dot ${pl && pl.connected ? '' : 'off'}" style="background:${pl && pl.connected ? color : ''}"></span>
+        <b style="color:${me ? color : ''}">${esc(pl ? pl.name : '…')}${me ? ' (you)' : ''}</b>
+        <span class="sub">$${state.budgets[i]} · ${state.teamSizes[i]}/6</span>`;
+      bar.appendChild(el);
+    }
+  }
+
+  function renderTurnBanner() {
+    const banner = $('turn-banner');
+    if (state.state !== 'auction' || state.toAct === null) {
+      banner.classList.add('hidden');
+      return;
+    }
+    const actor = state.toAct;
+    const isMe = actor === myIndex;
+    const color = PLAYER_COLORS[actor % PLAYER_COLORS.length];
+    const name = state.players[actor] ? state.players[actor].name : '?';
+    banner.classList.remove('hidden');
+    banner.classList.toggle('my', isMe);
+    banner.innerHTML = `<span class="dot" style="background:${color}"></span> ${isMe ? 'It\'s YOUR turn — bid or fold!' : `${esc(name)} is deciding…`}`;
+  }
+
+  function renderBoard() {
+    const board = $('board');
+    board.innerHTML = '';
+    state.pokemon.forEach((p, i) => {
+      const el = document.createElement('div');
+      el.className = 'card-slot';
+      const isCurrent = i === state.currentIndex && state.state === 'auction';
+
+      if (p.won) {
+        const color = PLAYER_COLORS[p.won.winner % PLAYER_COLORS.length];
+        const owner = state.players[p.won.winner] ? state.players[p.won.winner].name : '?';
+        el.style.borderColor = color;
+        el.innerHTML = `
+          <div class="owned-banner" style="color:${color}">$${p.won.price} · ${esc(owner)}</div>
+          <div class="art"><img src="${ART(p.id)}" alt="${esc(p.name)}" loading="lazy" /></div>
+          <div class="name">${esc(p.name)}</div>
+          <div class="types">${p.types.map(typeChip).join('')}</div>
+          <div class="stats">${STAT_KEYS.map((k) => `
+            <div class="stat-row"><span class="lbl">${STAT_LABELS[k]}</span><span class="val">${p.base[k]}</span></div>
+            ${statBar(p.base[k])}`).join('')}
+          </div>`;
+      } else {
+        el.innerHTML = `
+          <div class="hidden-mark">${isCurrent ? 'ON AUCTION' : 'HIDDEN'}</div>
+          <div class="art"><img src="${ART(p.id)}" alt="${esc(p.name)}" loading="lazy" /></div>
+          <div class="name">${esc(p.name)}</div>
+          <div class="types">${p.types.map(typeChip).join('')}</div>
+          <div class="stats">${p.revealed.map((r) => `
+            <div class="stat-row"><span class="lbl">${r.label}</span><span class="val">${r.value}</span></div>
+            ${statBar(r.value)}`).join('')}
+          </div>`;
+      }
+      if (isCurrent) {
+        el.style.outline = '2px solid var(--amber)';
+      }
+      board.appendChild(el);
+    });
+  }
+
+  function minBid() { return state.currentBid + 1; }
+  function myMax() { return state.maxBids[myIndex]; }
+
+  function renderAuction() {
+    const panel = $('auction-panel');
+    if (state.state !== 'auction') { panel.innerHTML = ''; stopCountdown(); return; }
+    const current = state.pokemon[state.currentIndex];
+    const myTurn = state.toAct === myIndex;
+    const myFull = state.teamSizes[myIndex] >= 6;
+    const bidderName = state.currentBidder === null ? null : state.players[state.currentBidder].name;
+    const lo = minBid();
+    const hi = myMax();
+    const canBid = !myFull && lo <= hi;
+
+    if (myTurn) bidValue = lo;
+    else if (bidValue < lo || bidValue > hi || !Number.isInteger(bidValue)) bidValue = lo;
+
+    const inChips = [];
+    for (let i = 0; i < state.numPlayers; i++) {
+      const pl = state.players[i];
+      const out = state.folded[i] || state.teamSizes[i] >= 6;
+      inChips.push(`<span class="in-chip ${out ? 'out' : ''}">${esc(pl.name)}</span>`);
+    }
+
+    panel.innerHTML = `
+      <div class="turn-badge ${myTurn ? 'my-turn' : ''}">
+        ${myTurn ? 'YOUR TURN' : `${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} is bidding`}
+      </div>
+      <div class="cd-wrap" id="cd-wrap">
+        <div class="cd-num" id="cd-num">–</div>
+        <div class="cd-col">
+          <div class="cd-bar"><i id="cd-bar"></i></div>
+          <div class="cd-label">${myTurn ? 'Time to bid — hurry!' : 'Time remaining'}</div>
+        </div>
+      </div>
+
+      <div class="auction-title">Now auctioning</div>
+      <div class="auction-name">${esc(current.name)}</div>
+      <div class="auction-types">${current.types.map(typeChip).join('')}</div>
+      <div class="auction-stats">
+        ${current.revealed.map((r) => `
+          <div>
+            <div class="stat-row"><span class="lbl">${r.label}</span><span class="val">${r.value}</span></div>
+            ${statBar(r.value)}
+          </div>`).join('')}
+      </div>
+      <div class="status-line">
+        Current bid: <span class="highlight">$${state.currentBid}</span>
+        ${bidderName ? ` by <b>${esc(bidderName)}</b>` : ' (no bids yet)'}
+      </div>
+      <div class="status-line">
+        Your budget: <b>$${state.budgets[myIndex]}</b> · Slots left: <b>${6 - state.teamSizes[myIndex]}</b>
+      </div>
+      <div class="in-list">${inChips.join('')}</div>
+      ${state.lastWinner !== null && state.currentIndex > 0 ? `<div class="winner-line">Last: <b>${esc(state.players[state.lastWinner].name)}</b> won ${esc(state.pokemon[state.currentIndex - 1].name)} for $${state.pokemon[state.currentIndex - 1].won.price}</div>` : ''}
+
+      ${myTurn ? `
+        ${myFull
+          ? `<div class="status-line">Your team is full — you must fold.</div><button class="btn" id="btn-fold-full">Fold</button>`
+          : (canBid ? `
+            <div class="bid-box">
+              <div class="wheel-hint">Scroll to bid · or type</div>
+              <div class="bid-wheel" id="bid-wheel">
+                <button class="wh-btn" id="wh-down">−</button>
+                <input id="bid-input" type="text" inputmode="numeric" value="${bidValue}" />
+                <button class="wh-btn" id="wh-up">+</button>
+              </div>
+              <div class="bid-range">$${lo} – $${hi}</div>
+              <div class="bid-controls">
+                <button class="btn primary bid-btn" id="btn-bid">Bid $<span id="bid-amt">${bidValue}</span></button>
+                <button class="btn bid-btn" id="btn-fold">Fold</button>
+              </div>
+            </div>`
+          : `<div class="status-line">You can't afford to raise — you must fold.</div><button class="btn" id="btn-fold-full">Fold</button>`)}
+      ` : ``}
+    `;
+
+    if (myTurn) {
+      bindBidControls(lo, hi, canBid);
+      const foldBtn = panel.querySelector('#btn-fold, #btn-fold-full');
+      if (foldBtn) foldBtn.addEventListener('click', () => { SFX.fold(); if (socket) socket.emit('fold'); });
+      const bidBtn = panel.querySelector('#btn-bid');
+      if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } });
+    }
+
+    startCountdown();
+  }
+
+  function bindBidControls(lo, hi, canBid) {
+    const input = $('bid-input');
+    const wheel = $('bid-wheel');
+    const amtEl = $('bid-amt');
+    const bidBtn = $('btn-bid');
+
+    function set(v) {
+      let n = Math.floor(Number(v));
+      if (!Number.isFinite(n)) n = lo;
+      n = Math.max(lo, Math.min(hi, n));
+      bidValue = n;
+      input.value = n;
+      if (amtEl) amtEl.textContent = n;
+    }
+
+    input.addEventListener('input', () => {
+      const digits = input.value.replace(/[^0-9]/g, '');
+      if (digits === '') { input.value = ''; return; }
+      set(parseInt(digits, 10));
+    });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } }
+      if (e.key === 'ArrowUp') { e.preventDefault(); set(bidValue + 1); }
+      if (e.key === 'ArrowDown') { e.preventDefault(); set(bidValue - 1); }
+    });
+    input.addEventListener('blur', () => set(bidValue));
+    wheel.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      if (!canBid) return;
+      set(bidValue + (e.deltaY < 0 ? 1 : -1));
+    }, { passive: false });
+    $('wh-up').addEventListener('click', () => set(bidValue + 1));
+    $('wh-down').addEventListener('click', () => set(bidValue - 1));
+    if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } });
+  }
+
+  // ---------- countdown ----------
+  function startCountdown() {
+    stopCountdown();
+    warnedThisTurn = false;
+    if (state.state !== 'auction' || state.toAct === null || !state.deadline) return;
+    const offset = state.serverNow - Date.now();
+    const total = state.turnSeconds * 1000;
+    const wrap = $('cd-wrap');
+    const num = $('cd-num');
+    const bar = $('cd-bar');
+    const actor = state.toAct;
+
+    function tick() {
+      if (!state || state.state !== 'auction' || state.toAct !== actor) { stopCountdown(); return; }
+      const ms = Math.max(0, state.deadline - (Date.now() + offset));
+      const secs = Math.ceil(ms / 1000);
+      if (num) num.textContent = secs;
+      if (bar) bar.style.width = (ms / total) * 100 + '%';
+      if (wrap) {
+        wrap.classList.toggle('warn', secs <= 15 && secs > 10);
+        wrap.classList.toggle('danger', secs <= 10);
+      }
+      if (secs <= 10 && secs > 0 && !warnedThisTurn) { warnedThisTurn = true; SFX.warn(); }
+      if (ms <= 0) return;
+    }
+    tick();
+    countdownTimer = setInterval(tick, 100);
+  }
+  function stopCountdown() {
+    if (countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+  }
+
+  // ---------- team ----------
+  function renderTeam() {
+    const panel = $('team-panel');
+    const myTeam = state.teams[myIndex];
+    const budget = state.budgets[myIndex];
+    const remaining = 6 - myTeam.length;
+    const slots = [];
+    myTeam.forEach((p) => {
+      slots.push(`
+        <div class="team-row">
+          <img class="timg" src="${ART(p.id)}" alt="" loading="lazy" />
+          <div><div class="tname">${esc(p.name)}</div><div class="tmeta">${p.types.map(typeChip).join('')}</div></div>
+          <div class="tprice">$${p.price}</div>
+        </div>`);
+    });
+    for (let i = 0; i < remaining; i++) slots.push(`<div class="empty-slot">Empty slot</div>`);
+
+    panel.innerHTML = `
+      <div class="team-head">
+        <div style="font-weight:800">Your team</div>
+        <div class="budget ${budget <= 0 ? 'zero' : (remaining === 0 ? 'done' : '')}">$${budget} left</div>
+      </div>
+      ${slots.join('')}
+    `;
+  }
+
+  // ---------- reveal overlay ----------
+  function showReveal(award) {
+    const isMe = award.winner === myIndex;
+    const winnerName = state.players[award.winner] ? state.players[award.winner].name : '?';
+    const color = PLAYER_COLORS[award.winner % PLAYER_COLORS.length];
+    const p = award.pokemon;
+
+    if (isMe) SFX.win();
+
+    $('reveal').classList.remove('hidden');
+    $('reveal-img').src = ART(p.id);
+    $('reveal-title').textContent = isMe ? 'Congratulations!' : 'Drafted!';
+    $('reveal-title').style.color = color;
+    $('reveal-name').innerHTML = `${isMe ? 'You got' : esc(winnerName) + ' got'} <span class="rn-poke">${esc(p.name)}</span>`;
+    $('reveal-types').innerHTML = p.types.map(typeChip).join('');
+    $('reveal-stats').innerHTML = STAT_KEYS.map((k) =>
+      `<div class="rv-stat"><span>${STAT_LABELS[k]}</span><b>${p.base[k]}</b></div>`).join('');
+    $('reveal-price').textContent = 'Won for $' + award.price;
+    spawnSparkles(color);
+  }
+  function hideReveal() { $('reveal').classList.add('hidden'); }
+
+  function spawnSparkles(color) {
+    const wrap = $('reveal-sparkles');
+    wrap.innerHTML = '';
+    const colors = [color, '#ffc94d', '#fff', '#ff9a45'];
+    for (let i = 0; i < 26; i++) {
+      const s = document.createElement('span');
+      const size = 6 + Math.random() * 8;
+      s.style.width = size + 'px';
+      s.style.height = size + 'px';
+      s.style.left = Math.random() * 100 + '%';
+      s.style.top = Math.random() * 100 + '%';
+      s.style.background = colors[Math.floor(Math.random() * colors.length)];
+      s.style.animationDelay = (Math.random() * 0.6) + 's';
+      s.style.animationDuration = (0.9 + Math.random() * 1.1) + 's';
+      wrap.appendChild(s);
+    }
+    setTimeout(() => { wrap.innerHTML = ''; }, 2500);
+  }
+
+  // ---------- done (list only) ----------
+  function renderDone() {
+    show('screen-done');
+    const wrap = $('done-teams');
+    const teamsHtml = state.teams.map((team, i) => {
+      const owner = state.players[i] ? state.players[i].name : 'Player ' + (i + 1);
+      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const cards = team.map((p) => `
+        <div class="done-card">
+          <img src="${ART(p.id)}" alt="" loading="lazy" />
+          <div>
+            <div class="dc-name">${esc(p.name)}</div>
+            <div class="dc-types">${p.types.map(typeChip).join('')}</div>
+          </div>
+        </div>`).join('');
+      return `
+        <div class="done-team" style="border-top:3px solid ${color}">
+          <h3>${esc(owner)}${i === myIndex ? ' (you)' : ''}</h3>
+          ${cards}
+        </div>`;
+    }).join('');
+
+    wrap.innerHTML = `
+      ${teamsHtml}
+      <div class="export-actions" style="grid-column:1/-1">
+        <button class="btn primary" id="btn-copy-team">Copy my team</button>
+        <button class="btn primary" id="btn-download-team">Download my team</button>
+      </div>`;
+
+    $('btn-copy-team').addEventListener('click', () => {
+      const text = teamText();
+      navigator.clipboard.writeText(text).then(() => toast('Team copied!')).catch(() => prompt('Copy:', text));
+    });
+    $('btn-download-team').addEventListener('click', () => {
+      const text = teamText();
+      const blob = new Blob([text], { type: 'text/plain' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'my-pokebid-team.txt';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    });
+  }
+
+  function teamText() {
+    const team = state.teams[myIndex];
+    const lines = ['PokéBid Team — ' + (state.players[myIndex] ? state.players[myIndex].name : 'You'), ''];
+    team.forEach((p) => {
+      lines.push(`- ${p.name} (${p.types.join('/')})`);
+    });
+    return lines.join('\n');
+  }
+
+  // ---------- socket ----------
+  const conn = $('conn');
+  const noServer = $('no-server');
+  function setConn(text, cls) { conn.textContent = text; conn.className = 'conn ' + cls; }
+
+  if (socket) {
+    socket.on('connect', () => { setConn('Connected', 'ok'); noServer.classList.add('hidden'); });
+    socket.on('disconnect', () => setConn('Reconnecting…', ''));
+    socket.on('connect_error', () => { setConn('No server', 'err'); noServer.classList.remove('hidden'); });
+
+    socket.on('state', (s) => {
+      state = s;
+      myIndex = s.playerIndex;
+      render();
+    });
+    socket.on('error', (msg) => toast(msg, true));
+    socket.on('connect', () => {
+      const params = new URLSearchParams(location.search);
+      const joinCode = params.get('join');
+      if (joinCode && state === null) {
+        $('code-input').value = joinCode;
+        const name = $('name-input').value.trim() || 'Player 2';
+        socket.emit('join', { playerId, name, code: joinCode.toUpperCase() }, (res) => {
+          if (!res.ok) return toast(res.error, true);
+          myIndex = res.playerIndex;
+          show('screen-lobby');
+        });
+      }
+    });
+  } else {
+    setConn('No server', 'err');
+    noServer.classList.remove('hidden');
+  }
+  })();
+  </script>
+</body>
+</html>
