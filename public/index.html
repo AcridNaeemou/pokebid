@@ -119,7 +119,6 @@ input:focus { border-color: var(--orange); }
 .btn.ghost { background: transparent; box-shadow: none; }
 .btn:disabled { opacity: .45; cursor: not-allowed; }
 .btn.big { font-size: 17px; padding: 16px; }
-.bid-btn { font-size: 16px; font-weight: 800; padding: 13px 14px; }
 
 .big-code {
   font-size: 52px; font-weight: 900; letter-spacing: 12px; color: var(--amber);
@@ -205,14 +204,9 @@ input:focus { border-color: var(--orange); }
 .meta-box .mb-value { font-size: 20px; font-weight: 800; }
 .meta-box .mb-value.amber { color: var(--amber); }
 
-.highlight { color: var(--amber); font-weight: 800; }
 .winner-line { font-size: 13px; color: var(--muted); }
 .turn-badge { align-self: flex-start; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
 .turn-badge.my-turn { background: rgba(255,201,77,.15); border-color: var(--amber); color: var(--amber); }
-.in-list { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.in-chip { font-size: 12px; font-weight: 700; padding: 4px 11px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
-.in-chip.out { opacity: .4; text-decoration: line-through; }
-.in-chip.leading { border-color: var(--amber); color: var(--amber); }
 
 /* turn order strip */
 .order-strip { display: flex; flex-direction: column; gap: 6px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
@@ -238,8 +232,7 @@ input:focus { border-color: var(--orange); }
 .cd-wrap.danger .cd-bar > i { background: linear-gradient(90deg, var(--red), var(--orange-2)); }
 @keyframes pulse-danger { 0%,100% { outline: 2px solid transparent; } 50% { outline: 3px solid rgba(255,90,77,.6); outline-offset: 2px; } }
 
-/* bid wheel */
-.bid-box { display: flex; flex-direction: column; gap: 10px; }
+/* bid wheel (in the fixed action bar) */
 .wheel-hint { font-size: 11px; color: var(--muted); text-align: center; }
 .bid-wheel { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
 .bid-wheel input { flex: 1; text-align: center; font-size: 30px; font-weight: 900; background: transparent; border: none; outline: none; color: var(--amber); font-variant-numeric: tabular-nums; padding: 4px; }
@@ -247,7 +240,6 @@ input:focus { border-color: var(--orange); }
 .wh-btn:hover { filter: brightness(1.2); transform: translateY(-1px); }
 .wh-btn:active { transform: scale(.95); }
 .bid-range { font-size: 12px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
-.bid-controls { display: flex; gap: 8px; }
 
 /* team panel */
 .team-panel { display: flex; flex-direction: column; gap: 12px; }
@@ -262,8 +254,8 @@ input:focus { border-color: var(--orange); }
 .team-row .tprice { font-weight: 800; color: var(--amber); font-variant-numeric: tabular-nums; }
 .empty-slot { color: var(--muted); font-size: 13px; border: 1px dashed var(--line); border-radius: 14px; padding: 14px; text-align: center; }
 
-/* board (won so far) */
-.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; }
+/* board (won so far) — 3-4 per row */
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; max-width: 900px; margin: 0 auto; }
 .card-slot { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; display: flex; flex-direction: column; position: relative; }
 .card-slot .art { width: 100%; aspect-ratio: 1/1; background: radial-gradient(circle at 50% 42%, #33291f, #1b1611); display: flex; align-items: center; justify-content: center; }
 .card-slot .art img { width: 84%; height: 84%; object-fit: contain; }
@@ -309,6 +301,41 @@ input:focus { border-color: var(--orange); }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 .toast.error { border-color: var(--orange); color: #ffc2a1; }
 
+/* action popup (shows what the acting player did) */
+.action-popup {
+  position: fixed; top: 76px; left: 50%; transform: translateX(-50%);
+  z-index: 56; padding: 10px 20px; border-radius: 999px;
+  background: var(--panel-solid); border: 1px solid var(--line);
+  font-weight: 700; font-size: 14px; white-space: nowrap;
+  box-shadow: 0 8px 26px rgba(0,0,0,.5);
+  opacity: 0; pointer-events: none;
+  transition: opacity .22s ease;
+}
+.action-popup.show { opacity: 1; }
+.action-popup .ap-amount { color: var(--amber); font-weight: 800; }
+.action-popup .ap-type { color: var(--orange-2); font-weight: 800; }
+.action-popup.fold .ap-type { color: var(--muted); }
+
+/* fixed bottom action bar (bid controls float above content) */
+.action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
+  background: rgba(18,16,14,.97); backdrop-filter: blur(12px);
+  border-top: 1px solid var(--line);
+  padding: 12px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+  display: flex; flex-direction: column; gap: 10px;
+  box-shadow: 0 -8px 30px rgba(0,0,0,.5);
+}
+.action-bar .bid-controls { display: flex; gap: 10px; }
+.action-bar .bid-controls .btn { flex: 1; }
+body.action-active .pane { padding-bottom: 200px; }
+
+/* your-turn accent */
+body.my-turn .cd-num { color: var(--green); }
+body.my-turn .cd-bar > i { background: linear-gradient(90deg, #2fa84f, var(--green)); }
+body.my-turn .turn-banner { background: var(--green); border-color: var(--green); color: #07240f; }
+body.my-turn .turn-banner .dot { background: #07240f; }
+body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
+
 .conn { position: fixed; top: 14px; right: 16px; z-index: 60; font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--amber); display: flex; align-items: center; gap: 7px; pointer-events: none; }
 .conn::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--amber); animation: pulse 1.2s infinite; }
 .conn.ok { color: var(--green); border-color: var(--green); opacity: 0; transition: opacity .4s ease .8s; }
@@ -345,8 +372,9 @@ input:focus { border-color: var(--orange); }
 </head>
 <body>
   <div id="toast" class="toast"></div>
+  <div id="action-popup" class="action-popup"></div>
   <div id="conn" class="conn">Connecting…</div>
-  <button id="mute-btn" class="mute-btn" title="Toggle sound">🔊</button>
+  <button id="mute-btn" class="mute-btn" title="Toggle sound effects">🔊</button>
   <button id="music-btn" class="mute-btn music-btn" title="Toggle music">🎵</button>
   <div id="no-server" class="no-server hidden">
     <div class="ns-card">
@@ -435,6 +463,9 @@ input:focus { border-color: var(--orange); }
     </main>
   </div>
 
+  <!-- FIXED BID ACTION BAR -->
+  <div id="action-bar" class="action-bar hidden"></div>
+
   <!-- DONE -->
   <div id="screen-done" class="screen hidden">
     <div class="done-head center">
@@ -497,7 +528,6 @@ input:focus { border-color: var(--orange); }
   let countdownTimer = null;
   let warnedThisTurn = false;
   let prevToAct = null;
-  let activeTab = 'auction';
   let poolCache = null;
 
   const $ = (id) => document.getElementById(id);
@@ -552,11 +582,37 @@ input:focus { border-color: var(--orange); }
       o.connect(g); g.connect(c.destination);
       o.start(t); o.stop(t + dur + 0.03);
     }
+    function noise(dur, vol, ftype, freq, delay = 0) {
+      if (muted) return;
+      const c = ensure(); if (!c) return;
+      const t = c.currentTime + delay;
+      const n = Math.max(1, Math.floor(c.sampleRate * dur));
+      const buffer = c.createBuffer(1, n, c.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < n; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / n);
+      const src = c.createBufferSource();
+      src.buffer = buffer;
+      const filter = c.createBiquadFilter();
+      filter.type = ftype;
+      filter.frequency.value = freq;
+      const g = c.createGain();
+      g.gain.value = vol;
+      src.connect(filter); filter.connect(g); g.connect(c.destination);
+      src.start(t); src.stop(t + dur);
+    }
     return {
       pop: () => tone(340, 680, 0.09, 0.10),
       hover: () => tone(240, 280, 0.045, 0.028),
-      bid: () => { tone(440, 440, 0.07, 0.09); tone(660, 660, 0.08, 0.08, 'sine', 0.06); },
-      fold: () => tone(300, 180, 0.12, 0.09),
+      chips: () => {
+        noise(0.05, 0.11, 'highpass', 3200);
+        noise(0.04, 0.08, 'highpass', 2600, 0.05);
+        noise(0.05, 0.10, 'highpass', 3800, 0.10);
+      },
+      fold: () => {
+        noise(0.20, 0.07, 'bandpass', 700);
+        tone(320, 160, 0.20, 0.05);
+      },
+      turn: () => { tone(880, 880, 0.09, 0.08); tone(1174, 1174, 0.16, 0.08, 'sine', 0.10); },
       warn: () => { tone(660, 660, 0.12, 0.09, 'square'); tone(660, 660, 0.12, 0.09, 'square', 0.18); },
       win: () => { tone(523, 523, 0.12, 0.10); tone(659, 659, 0.12, 0.10, 'sine', 0.11); tone(784, 784, 0.22, 0.10, 'sine', 0.22); },
       unlock: () => { ensure(); },
@@ -567,30 +623,36 @@ input:focus { border-color: var(--orange); }
 
   function updateMuteIcon() { $('mute-btn').textContent = SFX.muted ? '🔇' : '🔊'; }
   $('mute-btn').addEventListener('click', () => { SFX.toggleMute(); updateMuteIcon(); });
+  document.addEventListener('pointerdown', () => SFX.unlock(), { once: false });
+  document.addEventListener('mouseover', (e) => {
+    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab, .mute-btn');
+    if (el && e.relatedTarget && !el.contains(e.relatedTarget)) SFX.hover();
+  });
+  document.addEventListener('click', (e) => {
+    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab');
+    if (el) SFX.pop();
+  });
 
   // ---------- background music (playlist + crossfade) ----------
   const BGM_FILES = ['/music/bgm1.mp3', '/music/bgm2.mp3', '/music/bgm3.mp3'];
-  const BGM_VOL = 0.15; // quiet background level — audible but never overwhelming
-  const CROSSFADE = 3.0; // seconds of overlap between songs
+  const BGM_VOL = 0.15;
+  const CROSSFADE = 3.0;
 
   let musicOn = true;
   let musicStarted = false;
   let trackA = null, trackB = null;
-  let active = null;    // the audio element currently playing
-  let activeIdx = -1;
+  let active = null;
 
   function updateMusicIcon() {
     $('music-btn').classList.toggle('off', !musicOn);
     $('music-btn').textContent = musicOn ? '🎵' : '🔕';
   }
-
   function newTrack() {
     const a = new Audio();
     a.preload = 'auto';
     a.volume = 0;
     return a;
   }
-
   function ramp(el, to, ms, done) {
     const from = el.volume;
     const t0 = performance.now();
@@ -601,7 +663,6 @@ input:focus { border-color: var(--orange); }
       else if (done) done();
     })();
   }
-
   function scheduleCrossfade(el, idx) {
     el.onended = null;
     const onUpdate = () => {
@@ -609,12 +670,11 @@ input:focus { border-color: var(--orange); }
       el.removeEventListener('timeupdate', onUpdate);
       const next = (idx + 1) % BGM_FILES.length;
       const other = el === trackA ? trackB : trackA;
-      playInto(other, next, el); // other fades in, el fades out
+      playInto(other, next, el);
     };
     el.addEventListener('timeupdate', onUpdate);
-    el.addEventListener('error', () => { el.removeEventListener('timeupdate', onUpdate); });
+    el.addEventListener('error', () => el.removeEventListener('timeupdate', onUpdate));
   }
-
   function playInto(el, idx, fadingOut) {
     el.src = BGM_FILES[idx];
     el.volume = 0;
@@ -623,16 +683,13 @@ input:focus { border-color: var(--orange); }
     ramp(el, BGM_VOL, CROSSFADE * 1000);
     if (fadingOut) ramp(fadingOut, 0, CROSSFADE * 1000, () => { try { fadingOut.pause(); } catch (e) {} });
     active = el;
-    activeIdx = idx;
     scheduleCrossfade(el, idx);
   }
-
   function startMusic() {
     if (!musicOn || musicStarted) return;
     musicStarted = true;
     trackA = newTrack();
     trackB = newTrack();
-    // random starting song per client
     const start = Math.floor(Math.random() * BGM_FILES.length);
     trackA.src = BGM_FILES[start];
     trackA.volume = 0;
@@ -640,41 +697,27 @@ input:focus { border-color: var(--orange); }
     if (p && p.catch) p.catch(() => {});
     ramp(trackA, BGM_VOL, 1200);
     active = trackA;
-    activeIdx = start;
     scheduleCrossfade(trackA, start);
   }
-
   function stopMusic() {
     [trackA, trackB].forEach((t) => { if (t) { try { t.pause(); } catch (e) {} } });
   }
   function resumeMusic() {
     if (active) { try { active.play().catch(() => {}); } catch (e) {} }
   }
-
   $('music-btn').addEventListener('click', () => {
     musicOn = !musicOn;
     updateMusicIcon();
     if (musicOn) { if (musicStarted) resumeMusic(); else startMusic(); }
     else stopMusic();
   });
-
   document.addEventListener('pointerdown', () => {
     SFX.unlock();
-    // If autoplay was blocked when the lobby first appeared, retry on next tap.
     if (musicStarted && musicOn && active && active.paused) resumeMusic();
   }, { once: false });
-  document.addEventListener('mouseover', (e) => {
-    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab, .mute-btn');
-    if (el && e.relatedTarget && !el.contains(e.relatedTarget)) SFX.hover();
-  });
-  document.addEventListener('click', (e) => {
-    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab');
-    if (el) SFX.pop();
-  });
 
   // ---------- tabs ----------
   function setTab(tab) {
-    activeTab = tab;
     ['auction', 'team', 'board'].forEach((t) => {
       $('tab-' + t).classList.toggle('active', t === tab);
       $('tab-' + t + '-pane').classList.toggle('hidden', t !== tab);
@@ -731,10 +774,7 @@ input:focus { border-color: var(--orange); }
     const query = (q || '').trim().toLowerCase();
     const filtered = query ? list.filter((p) => p.name.toLowerCase().includes(query)) : list;
     $('pool-count').textContent = `(${list.length})`;
-    if (!filtered.length) {
-      grid.innerHTML = '<p class="muted">No Pokémon match that search.</p>';
-      return;
-    }
+    if (!filtered.length) { grid.innerHTML = '<p class="muted">No Pokémon match that search.</p>'; return; }
     grid.innerHTML = filtered.map((p) => `
       <div class="pool-item">
         <img src="${ART(p.id)}" alt="${esc(p.name)}" loading="lazy" />
@@ -769,14 +809,16 @@ input:focus { border-color: var(--orange); }
     show('screen-game');
     $('game-code').textContent = state.code;
 
-    // auto-jump to Auction pane when it becomes your turn
     if (state.state === 'auction' && state.toAct === myIndex && prevToAct !== myIndex) {
       setTab('auction');
+      SFX.turn();
     }
     prevToAct = state.toAct;
+    document.body.classList.toggle('my-turn', state.state === 'auction' && state.toAct === myIndex);
 
     renderTurnBanner();
     renderAuction();
+    renderActionBar();
     renderTeam();
     renderBoard();
     if (state.state === 'reveal' && state.lastAward) showReveal(state.lastAward);
@@ -820,10 +862,7 @@ input:focus { border-color: var(--orange); }
 
   function renderTurnBanner() {
     const banner = $('turn-banner');
-    if (state.state !== 'auction' || state.toAct === null) {
-      banner.classList.add('hidden');
-      return;
-    }
+    if (state.state !== 'auction' || state.toAct === null) { banner.classList.add('hidden'); return; }
     const actor = state.toAct;
     const isMe = actor === myIndex;
     const color = PLAYER_COLORS[actor % PLAYER_COLORS.length];
@@ -841,17 +880,8 @@ input:focus { border-color: var(--orange); }
     if (state.state !== 'auction') { panel.innerHTML = ''; stopCountdown(); return; }
     const current = state.pokemon[state.currentIndex];
     const myTurn = state.toAct === myIndex;
-    const myFull = state.teamSizes[myIndex] >= 6;
     const bidderName = state.currentBidder === null ? null : state.players[state.currentBidder].name;
-    const lo = minBid();
-    const hi = myMax();
-    const canBid = !myFull && lo <= hi;
     const total = state.numPlayers * 6;
-
-    if (myTurn) bidValue = lo;
-    else if (bidValue < lo || bidValue > hi || !Number.isInteger(bidValue)) bidValue = lo;
-
-    const isOpening = state.currentBidder === null && state.currentBid === 0;
 
     const orderChips = (state.turnOrder || []).map((i, pos) => {
       const pl = state.players[i];
@@ -893,7 +923,7 @@ input:focus { border-color: var(--orange); }
         <div class="cd-num" id="cd-num">–</div>
         <div class="cd-col">
           <div class="cd-bar"><i id="cd-bar"></i></div>
-          <div class="cd-label">${myTurn ? (isOpening ? 'Your turn — place the first bid!' : 'Your turn — bid or fold!') : `${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} is bidding`}</div>
+          <div class="cd-label">${myTurn ? 'Your turn — bid or fold!' : `${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} is bidding`}</div>
         </div>
       </div>
 
@@ -902,61 +932,70 @@ input:focus { border-color: var(--orange); }
         ${orderChips.join('')}
       </div>
       <div class="winner-line" style="text-align:center">Auction ${state.currentIndex + 1} of ${total}${state.lastWinner !== null && state.currentIndex > 0 ? ` · Last: <b>${esc(state.players[state.lastWinner].name)}</b> won it` : ''}</div>
-
-      ${myTurn ? `
-        ${myFull
-          ? `<div class="muted" style="text-align:center">Your team is full — you must fold.</div><button class="btn" id="btn-fold-full">Fold</button>`
-          : (canBid ? `
-            <div class="bid-box">
-              <div class="wheel-hint">${isOpening ? 'You must place the first bid' : 'Scroll to bid · or type'}</div>
-              <div class="bid-wheel" id="bid-wheel">
-                <button class="wh-btn" id="wh-down">−</button>
-                <input id="bid-input" type="text" inputmode="numeric" value="${bidValue}" />
-                <button class="wh-btn" id="wh-up">+</button>
-              </div>
-              <div class="bid-range">$${lo} – $${hi}</div>
-              <div class="bid-controls">
-                <button class="btn primary bid-btn" id="btn-bid" style="flex:1">Bid $<span id="bid-amt">${bidValue}</span></button>
-                ${isOpening ? '' : '<button class="btn bid-btn" id="btn-fold" style="flex:1">Fold</button>'}
-              </div>
-            </div>`
-          : `<div class="muted" style="text-align:center">You can't afford to raise — you must fold.</div><button class="btn" id="btn-fold-full">Fold</button>`)}
-      ` : `<div class="muted" style="text-align:center">Waiting for ${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} to decide…</div>`}
     `;
 
-    if (myTurn) {
-      bindBidControls(lo, hi, canBid);
-      const foldBtn = panel.querySelector('#btn-fold, #btn-fold-full');
-      if (foldBtn) foldBtn.addEventListener('click', () => { SFX.fold(); if (socket) socket.emit('fold'); });
-      const bidBtn = panel.querySelector('#btn-bid');
-      if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } });
+    startCountdown();
+  }
+
+  function renderActionBar() {
+    const bar = $('action-bar');
+    const showBar = state.state === 'auction' && state.toAct === myIndex;
+    document.body.classList.toggle('action-active', showBar);
+    if (!showBar) { bar.classList.add('hidden'); return; }
+    bar.classList.remove('hidden');
+
+    const myFull = state.teamSizes[myIndex] >= 6;
+    const lo = minBid();
+    const hi = myMax();
+    const canBid = !myFull && lo <= hi;
+    const isOpening = state.currentBidder === null && state.currentBid === 0;
+
+    if (bidValue < lo || bidValue > hi || !Number.isInteger(bidValue)) bidValue = lo;
+
+    if (!canBid) {
+      bar.innerHTML = `<button class="btn" id="btn-fold-only" style="width:100%">Fold</button>`;
+      bar.querySelector('#btn-fold-only').addEventListener('click', () => { if (socket) socket.emit('fold'); });
+      return;
     }
 
-    startCountdown();
+    bar.innerHTML = `
+      <div class="bid-wheel" id="bid-wheel">
+        <button class="wh-btn" id="wh-down">−</button>
+        <input id="bid-input" type="text" inputmode="numeric" value="${bidValue}" />
+        <button class="wh-btn" id="wh-up">+</button>
+      </div>
+      <div class="bid-range">$${lo} – $${hi}${isOpening ? ' · you must open the bid' : ''}</div>
+      <div class="bid-controls">
+        ${isOpening ? '' : '<button class="btn" id="btn-fold">Fold</button>'}
+        <button class="btn primary" id="btn-bid">Bid $<span id="bid-amt">${bidValue}</span></button>
+      </div>
+    `;
+    bindBidControls(lo, hi, canBid);
+    const foldBtn = bar.querySelector('#btn-fold');
+    if (foldBtn) foldBtn.addEventListener('click', () => { if (socket) socket.emit('fold'); });
   }
 
   function bindBidControls(lo, hi, canBid) {
     const input = $('bid-input');
     const wheel = $('bid-wheel');
     const amtEl = $('bid-amt');
-    const bidBtn = $('btn-bid');
 
     function set(v) {
       let n = Math.floor(Number(v));
       if (!Number.isFinite(n)) n = lo;
       n = Math.max(lo, Math.min(hi, n));
       bidValue = n;
-      input.value = n;
+      if (input) input.value = n;
       if (amtEl) amtEl.textContent = n;
     }
 
     input.addEventListener('input', () => {
-      const digits = input.value.replace(/[^0-9]/g, '');
-      if (digits === '') { input.value = ''; return; }
-      set(parseInt(digits, 10));
+      const d = input.value.replace(/[^0-9]/g, '');
+      if (d === '') { input.value = ''; return; }
+      set(parseInt(d, 10));
     });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } }
+      if (e.key === 'Enter') { e.preventDefault(); if (canBid && socket) socket.emit('bid', bidValue); }
       if (e.key === 'ArrowUp') { e.preventDefault(); set(bidValue + 1); }
       if (e.key === 'ArrowDown') { e.preventDefault(); set(bidValue - 1); }
     });
@@ -968,7 +1007,6 @@ input:focus { border-color: var(--orange); }
     }, { passive: false });
     $('wh-up').addEventListener('click', () => set(bidValue + 1));
     $('wh-down').addEventListener('click', () => set(bidValue - 1));
-    if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid) { SFX.bid(); if (socket) socket.emit('bid', bidValue); } });
   }
 
   // ---------- countdown ----------
@@ -1094,6 +1132,24 @@ input:focus { border-color: var(--orange); }
     setTimeout(() => { wrap.innerHTML = ''; }, 2500);
   }
 
+  // ---------- action popup ----------
+  let actionPopupTimer;
+  function showActionPopup(a) {
+    const el = $('action-popup');
+    if (a.type === 'bid') {
+      el.innerHTML = `<span style="color:var(--muted)">${esc(a.name)}</span> <span class="ap-type">bid</span> <span class="ap-amount">$${a.amount}</span>`;
+      el.classList.remove('fold');
+      SFX.chips();
+    } else {
+      el.innerHTML = `<span style="color:var(--muted)">${esc(a.name)}</span> <span class="ap-type">folded</span>`;
+      el.classList.add('fold');
+      SFX.fold();
+    }
+    el.classList.add('show');
+    clearTimeout(actionPopupTimer);
+    actionPopupTimer = setTimeout(() => el.classList.remove('show'), 2000);
+  }
+
   // ---------- done ----------
   function renderDone() {
     show('screen-done');
@@ -1164,6 +1220,7 @@ input:focus { border-color: var(--orange); }
       if (enteredRoom) startMusic(); // lobby created → start music
       render();
     });
+    socket.on('action', (a) => showActionPopup(a));
     socket.on('error', (msg) => toast(msg, true));
     socket.on('connect', () => {
       const params = new URLSearchParams(location.search);
@@ -1184,5 +1241,5 @@ input:focus { border-color: var(--orange); }
   }
   })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a335187cdeb5db3e',t:'MTc4ODEwNjU0MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>

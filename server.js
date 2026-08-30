@@ -163,6 +163,11 @@ function broadcast(room) {
   });
 }
 
+// Emit a lightweight "this player acted" event so everyone can show a popup.
+function emitAction(room, action) {
+  io.to(room.code).emit('action', action);
+}
+
 // ---------- Auction flow ----------
 function award(room, winner, price) {
   const p = room.roster[room.currentIndex];
@@ -212,15 +217,18 @@ function setTurnTimer(room) {
   room.deadline = Date.now() + TURN_SECONDS * 1000;
   room.turnTimer = setTimeout(() => {
     if (room.state !== 'auction' || room.toAct !== actor) return;
+    const name = room.players[actor] ? room.players[actor].name : '?';
     if (room.currentBidder === null && room.currentBid === 0) {
       // Opening bidder must bid — auto-bid the $1 minimum on timeout.
       room.currentBid = 1;
       room.currentBidder = actor;
       touch(room);
+      emitAction(room, { type: 'bid', player: actor, name, amount: 1, auto: true });
       advanceTurn(room);
     } else {
-      room.folded[actor] = true; // timeout = fold (bid nothing, forfeit the mon)
+      room.folded[actor] = true; // timeout = fold
       touch(room);
+      emitAction(room, { type: 'fold', player: actor, name, auto: true });
       if (!resolveAuction(room)) advanceTurn(room);
     }
     broadcast(room);
@@ -244,6 +252,8 @@ function advanceTurn(room) {
     } else {
       // can't afford to raise → auto-fold (skip turn)
       room.folded[idx] = true;
+      const name = room.players[idx] ? room.players[idx].name : '?';
+      emitAction(room, { type: 'fold', player: idx, name, auto: true });
       if (resolveAuction(room)) return;
     }
   }
@@ -291,8 +301,7 @@ function nextAuction(room) {
     room.state = 'done';
     return;
   }
-  // Rotate the turn order one step forward each round, e.g.
-  // (B, C, A, D) -> (C, A, D, B) -> (A, D, B, C) -> ...
+  // Rotate the turn order one step forward each round.
   room.turnOrder = rotateLeft(room.turnOrder);
   beginAuction(room);
 }
@@ -385,6 +394,7 @@ io.on('connection', (socket) => {
     room.currentBid = amt;
     room.currentBidder = idx;
     touch(room);
+    emitAction(room, { type: 'bid', player: idx, name: room.players[idx].name, amount: amt });
     advanceTurn(room);
     broadcast(room);
   });
@@ -401,6 +411,7 @@ io.on('connection', (socket) => {
     }
     room.folded[idx] = true;
     touch(room);
+    emitAction(room, { type: 'fold', player: idx, name: room.players[idx].name });
     if (!resolveAuction(room)) advanceTurn(room);
     broadcast(room);
   });
@@ -425,8 +436,6 @@ server.listen(PORT, '0.0.0.0', () => {
 });
 
 // ---------- Room cleanup ----------
-// Remove rooms that have no connected players (orphaned) or have been idle
-// for a long time, so a shared server doesn't leak memory over time.
 const IDLE_MS = 2 * 60 * 60 * 1000; // 2 hours
 setInterval(() => {
   const now = Date.now();
