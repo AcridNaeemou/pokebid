@@ -47,9 +47,10 @@ const MAX_PLAYERS = 5;
 const TURN_SECONDS = parseInt(process.env.TURN_SECONDS || '30', 10);
 const REVEAL_SECONDS = parseFloat(process.env.REVEAL_SECONDS || '4');
 const COUNTDOWN_MS = 3000; // pre-draft countdown before the first auction
+const INTRO_MS = Math.round(parseFloat(process.env.INTRO_SECONDS || '4') * 1000); // pre-bid intro buffer
 
 const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
-const STAT_LABELS = { hp: 'HP', atk: 'Attack', def: 'Defense', spa: 'Sp. Atk', spd: 'Sp. Def', spe: 'Speed' };
+const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
 
 const rooms = new Map();
 
@@ -99,13 +100,13 @@ function maxBidFor(room, i) {
 
 function inAuction(room, i) { return !room.folded[i] && room.teams[i].length < TEAM_SIZE; }
 
-function createRoom(playerId, name, numPlayers) {
+function createRoom(playerId, name) {
   const code = newCode();
   const room = {
     code,
-    numPlayers,
-    players: Array(numPlayers).fill(null),
-    state: 'waiting', // waiting | lobby | countdown | auction | reveal | done | ended
+    maxPlayers: MAX_PLAYERS,
+    players: [], // grows as people join (up to MAX_PLAYERS)
+    state: 'waiting', // waiting | lobby | countdown | intro | auction | reveal | done | ended
     turnOrder: [],
     nextPos: 0,
     roster: [],
@@ -113,20 +114,23 @@ function createRoom(playerId, name, numPlayers) {
     currentBid: 0,
     currentBidder: null,
     toAct: null,
-    folded: Array(numPlayers).fill(false),
+    folded: [],
     deadline: null,
     lastWinner: null,
     lastAward: null,
-    budgets: Array(numPlayers).fill(BUDGET),
-    teams: Array.from({ length: numPlayers }, () => []),
+    budgets: [],
+    teams: [],
     turnTimer: null,
     revealTimer: null,
     countdownTimer: null,
     countdownEnd: null,
+    introTimer: null,
+    introEnd: null,
+    introBidder: null,
     endedBy: null,
     lastActivity: Date.now(),
   };
-  room.players[0] = { id: playerId, name: name || 'Player 1', connected: true, socketId: null };
+  room.players.push({ id: playerId, name: name || 'Player 1', connected: true, socketId: null });
   rooms.set(code, room);
   return room;
 }
@@ -136,13 +140,14 @@ function touch(room) { room.lastActivity = Date.now(); }
 function clearTurnTimer(room) { if (room.turnTimer) { clearTimeout(room.turnTimer); room.turnTimer = null; } }
 function clearRevealTimer(room) { if (room.revealTimer) { clearTimeout(room.revealTimer); room.revealTimer = null; } }
 function clearCountdownTimer(room) { if (room.countdownTimer) { clearTimeout(room.countdownTimer); room.countdownTimer = null; } }
+function clearIntroTimer(room) { if (room.introTimer) { clearTimeout(room.introTimer); room.introTimer = null; } }
 
 function buildView(room, playerIndex) {
   const pokemon = room.roster.map((p, i) => {
     if (p.won) return { id: p.id, name: p.name, types: p.types, base: p.base, won: p.won };
-    // Only the Pokémon currently on auction reveals its two stats.
-    // Everything else is fully hidden until someone wins it.
-    if (i === room.currentIndex && room.state === 'auction') {
+    // Only the Pokémon currently on the block reveals its two stats (during
+    // the pre-bid intro and the auction itself). Everything else stays hidden.
+    if (i === room.currentIndex && (room.state === 'auction' || room.state === 'intro')) {
       return {
         revealed: p.revealedStats.map((k) => ({ key: k, label: STAT_LABELS[k], value: p.base[k] })),
         won: null,
@@ -153,7 +158,7 @@ function buildView(room, playerIndex) {
   return {
     state: room.state,
     code: room.code,
-    numPlayers: room.numPlayers,
+    numPlayers: room.players.length,
     playerIndex,
     players: room.players.map((pl) => (pl ? { name: pl.name, connected: pl.connected } : null)),
     turnOrder: room.turnOrder,
@@ -172,17 +177,21 @@ function buildView(room, playerIndex) {
     deadline: room.deadline,
     serverNow: Date.now(),
     turnSeconds: TURN_SECONDS,
-    revealSeconds: REVEAL_SECONDS,
     countdownEnd: room.countdownEnd,
+    introEnd: room.introEnd,
+    introBidder: room.introBidder,
     endedBy: room.endedBy,
   };
 }
 
 function broadcast(room) {
+  // The view is identical for every player except `playerIndex`, so build it
+  // once and reuse a shallow copy for each socket.
+  const base = buildView(room, 0);
   room.players.forEach((p, i) => {
     if (p && p.socketId) {
       const s = io.sockets.sockets.get(p.socketId);
-      if (s) s.emit('state', buildView(room, i));
+      if (s) s.emit('state', { ...base, playerIndex: i });
     }
   });
 }
@@ -214,7 +223,7 @@ function award(room, winner, price) {
 
 function resolveAuction(room) {
   const ins = [];
-  for (let i = 0; i < room.numPlayers; i++) if (inAuction(room, i)) ins.push(i);
+  for (let i = 0; i < room.players.length; i++) if (inAuction(room, i)) ins.push(i);
   if (ins.length !== 1) return false;
   const winner = ins[0];
   const price = (room.currentBidder === winner) ? Math.max(1, room.currentBid) : 1;
@@ -223,7 +232,7 @@ function resolveAuction(room) {
 }
 
 function nextInAuction(room) {
-  const n = room.numPlayers;
+  const n = room.players.length;
   for (let s = 0; s < n; s++) {
     const pos = (room.nextPos + s) % n;
     const idx = room.turnOrder[pos];
@@ -262,7 +271,7 @@ function setTurnTimer(room) {
 function advanceTurn(room) {
   clearTurnTimer(room);
   room.toAct = null;
-  const n = room.numPlayers;
+  const n = room.players.length;
   for (let s = 0; s < n + 1; s++) {
     const idx = nextInAuction(room);
     if (idx === -1) {
@@ -287,34 +296,48 @@ function advanceTurn(room) {
 function beginAuction(room) {
   room.currentBid = 0;
   room.currentBidder = null;
-  room.folded = Array(room.numPlayers).fill(false);
+  room.folded = Array(room.players.length).fill(false);
   room.nextPos = 0;
   room.toAct = null;
   room.deadline = null;
-  room.state = 'auction';
-  advanceTurn(room);
+  // Pre-bid intro: pick the opening bidder now so the intro can highlight them,
+  // then transition into the timed bid after a short buffer.
+  const opener = nextInAuction(room);
+  if (opener === -1) { room.state = 'done'; return; }
+  room.introBidder = opener;
+  room.state = 'intro';
+  room.introEnd = Date.now() + INTRO_MS;
+  clearIntroTimer(room);
+  room.introTimer = setTimeout(() => {
+    if (room.state !== 'intro') return;
+    room.state = 'auction';
+    room.toAct = opener;
+    room.introBidder = null;
+    setTurnTimer(room);
+    broadcast(room);
+  }, INTRO_MS);
 }
 
 function startAuction(room) {
-  room.roster = buildRoster(room.numPlayers);
+  room.roster = buildRoster(room.players.length);
   room.currentIndex = 0;
   room.currentBid = 0;
   room.currentBidder = null;
-  room.budgets = Array(room.numPlayers).fill(BUDGET);
-  room.teams = Array.from({ length: room.numPlayers }, () => []);
+  room.budgets = Array(room.players.length).fill(BUDGET);
+  room.teams = Array.from({ length: room.players.length }, () => []);
   room.lastWinner = null;
   room.lastAward = null;
   beginAuction(room);
 }
 
 function nextAuction(room) {
-  if (room.currentIndex >= TEAM_SIZE * room.numPlayers) { room.state = 'done'; return; }
+  if (room.currentIndex >= TEAM_SIZE * room.players.length) { room.state = 'done'; return; }
   // If only one player still has open slots, batch-award the rest at $1.
   const open = [];
-  for (let i = 0; i < room.numPlayers; i++) if (room.teams[i].length < TEAM_SIZE) open.push(i);
+  for (let i = 0; i < room.players.length; i++) if (room.teams[i].length < TEAM_SIZE) open.push(i);
   if (open.length === 1) {
     const p0 = open[0];
-    while (room.currentIndex < TEAM_SIZE * room.numPlayers) {
+    while (room.currentIndex < TEAM_SIZE * room.players.length) {
       const p = room.roster[room.currentIndex];
       p.won = { winner: p0, price: 1 };
       room.budgets[p0] -= 1;
@@ -330,8 +353,8 @@ function nextAuction(room) {
   beginAuction(room);
 }
 
-function allJoined(room) {
-  return room.players.every((p) => p && p.connected);
+function canStart(room) {
+  return room.players.length >= MIN_PLAYERS && room.players.every((p) => p && p.connected);
 }
 
 // ---------- Socket handlers ----------
@@ -340,9 +363,7 @@ io.on('connection', (socket) => {
     try {
       const playerId = (payload && payload.playerId) || crypto.randomUUID();
       const name = (payload && payload.name) || '';
-      let num = parseInt(payload && payload.numPlayers, 10);
-      if (!Number.isFinite(num) || num < MIN_PLAYERS || num > MAX_PLAYERS) num = 2;
-      const room = createRoom(playerId, name, num);
+      const room = createRoom(playerId, name);
       room.players[0].socketId = socket.id;
       socket.data.roomCode = room.code;
       socket.data.playerIndex = 0;
@@ -361,17 +382,20 @@ io.on('connection', (socket) => {
       const name = (payload && payload.name) || '';
       const room = rooms.get(code);
       if (!room) { if (ack) ack({ ok: false, error: 'Room not found.' }); return; }
-
-      let playerIndex = -1;
-      let isNew = false;
-      for (let i = 0; i < room.numPlayers; i++) {
-        if (room.players[i] && room.players[i].id === playerId) { playerIndex = i; break; }
+      if (room.state !== 'waiting' && room.state !== 'lobby') {
+        if (ack) ack({ ok: false, error: 'This game has already started.' });
+        return;
       }
+
+      let playerIndex = room.players.findIndex((p) => p && p.id === playerId);
+      let isNew = false;
       if (playerIndex === -1) {
-        const empty = room.players.findIndex((p) => !p);
-        if (empty === -1) { if (ack) ack({ ok: false, error: 'This room is full.' }); return; }
-        room.players[empty] = { id: playerId, name: name || 'Player ' + (empty + 1), connected: true, socketId: null };
-        playerIndex = empty;
+        if (room.players.length >= room.maxPlayers) {
+          if (ack) ack({ ok: false, error: 'This room is full.' });
+          return;
+        }
+        room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null });
+        playerIndex = room.players.length - 1;
         isNew = true;
       }
       const pl = room.players[playerIndex];
@@ -382,9 +406,13 @@ io.on('connection', (socket) => {
       socket.data.playerIndex = playerIndex;
       socket.join(code);
 
-      if (room.state === 'waiting' && allJoined(room)) {
-        room.turnOrder = shuffle(room.players.map((_, i) => i));
-        room.state = 'lobby';
+      if (isNew) {
+        if (room.state === 'waiting' && canStart(room)) {
+          room.turnOrder = shuffle(room.players.map((_, i) => i));
+          room.state = 'lobby';
+        } else if (room.state === 'lobby') {
+          room.turnOrder = shuffle(room.players.map((_, i) => i));
+        }
       }
 
       if (ack) ack({ ok: true, code, playerIndex, playerId });
@@ -398,9 +426,13 @@ io.on('connection', (socket) => {
     const code = socket.data.roomCode;
     const idx = socket.data.playerIndex;
     const room = rooms.get(code);
-    if (!room || room.state !== 'lobby') return;
+    if (!room) return;
     if (idx !== 0) { socket.emit('error', 'Only the host can start the game.'); return; }
-    if (!allJoined(room)) { socket.emit('error', 'Waiting for all players to join.'); return; }
+    if (room.state !== 'lobby') {
+      if (room.state === 'waiting') socket.emit('error', 'Need at least 2 players to start.');
+      return;
+    }
+    if (!canStart(room)) { socket.emit('error', 'Waiting for all players to join.'); return; }
     // 3-second pre-draft countdown so players can get ready.
     clearCountdownTimer(room);
     room.state = 'countdown';
@@ -461,13 +493,14 @@ io.on('connection', (socket) => {
       pl.connected = false;
       pl.socketId = null;
       // If anyone leaves while the game is live, end it for everyone.
-      const active = ['waiting', 'lobby', 'countdown', 'auction', 'reveal'].includes(room.state);
+      const active = ['waiting', 'lobby', 'countdown', 'intro', 'auction', 'reveal'].includes(room.state);
       if (active) {
         room.state = 'ended';
         room.endedBy = pl.name;
         clearTurnTimer(room);
         clearRevealTimer(room);
         clearCountdownTimer(room);
+        clearIntroTimer(room);
       }
       broadcast(room);
     }
@@ -475,7 +508,7 @@ io.on('connection', (socket) => {
 });
 
 server.listen(PORT, '0.0.0.0', () => {
-  console.log(`PokéBid running on :${PORT} (turn=${TURN_SECONDS}s, reveal=${REVEAL_SECONDS}s)`);
+  console.log(`PokéBid running on :${PORT} (turn=${TURN_SECONDS}s, reveal=${REVEAL_SECONDS}s, intro=${INTRO_MS}ms)`);
 });
 
 // ---------- Room cleanup ----------
@@ -489,6 +522,7 @@ setInterval(() => {
       clearTurnTimer(room);
       clearRevealTimer(room);
       clearCountdownTimer(room);
+      clearIntroTimer(room);
       rooms.delete(code);
       console.log(`cleaned up room ${code}`);
     }

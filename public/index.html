@@ -80,21 +80,6 @@ input {
 }
 input:focus { border-color: var(--orange); }
 
-.field { display: flex; flex-direction: column; gap: 8px; text-align: left; }
-.field-label { font-size: 13px; color: var(--muted); font-weight: 600; }
-.seg { display: grid; grid-auto-flow: column; gap: 8px; }
-.seg-btn {
-  padding: 12px; font-size: 16px; font-weight: 800; border-radius: 11px; cursor: pointer;
-  background: var(--panel2); border: 2px solid var(--line); color: var(--muted); font-family: inherit;
-  transition: all .12s ease;
-}
-.seg-btn:hover { color: var(--text); border-color: var(--muted); }
-.seg-btn.active {
-  background: linear-gradient(180deg, var(--orange-2), var(--orange-deep));
-  border-color: var(--orange-2); color: #fff; transform: translateY(-1px);
-  outline: 2px solid var(--orange); outline-offset: 2px;
-}
-
 .divider { display: flex; align-items: center; gap: 10px; color: var(--muted); font-size: 12px; }
 .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: var(--line); }
 .row { display: flex; align-items: center; }
@@ -132,7 +117,6 @@ input:focus { border-color: var(--orange); }
 .lobby-slot.filled .dot { background: var(--green); }
 .lobby-slot .ls-name { font-weight: 700; }
 .lobby-slot .ls-you { font-size: 11px; color: var(--orange); font-weight: 700; margin-left: 4px; }
-.lobby-slot .ls-wait { color: var(--muted); font-size: 13px; }
 .lobby-order { width: 100%; margin-top: 4px; }
 .order-label { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
 .order-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: center; }
@@ -204,8 +188,6 @@ input:focus { border-color: var(--orange); }
 .meta-box .mb-value.amber { color: var(--amber); }
 
 .winner-line { font-size: 13px; color: var(--muted); }
-.turn-badge { align-self: flex-start; font-size: 12px; font-weight: 800; padding: 5px 12px; border-radius: 999px; background: var(--panel2); border: 1px solid var(--line); color: var(--muted); }
-.turn-badge.my-turn { background: rgba(255,201,77,.15); border-color: var(--amber); color: var(--amber); }
 
 /* turn order strip */
 .order-strip { display: flex; flex-direction: column; gap: 6px; background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; }
@@ -232,7 +214,6 @@ input:focus { border-color: var(--orange); }
 @keyframes pulse-danger { 0%,100% { outline: 2px solid transparent; } 50% { outline: 3px solid rgba(255,90,77,.6); outline-offset: 2px; } }
 
 /* bid wheel (in the fixed action bar) */
-.wheel-hint { font-size: 11px; color: var(--muted); text-align: center; }
 .bid-wheel { display: flex; align-items: center; gap: 8px; background: var(--panel2); border: 1px solid var(--line); border-radius: 14px; padding: 8px; }
 .bid-wheel input { flex: 1; text-align: center; font-size: 30px; font-weight: 900; background: transparent; border: none; outline: none; color: var(--amber); font-variant-numeric: tabular-nums; padding: 4px; }
 .wh-btn { width: 46px; height: 46px; flex: none; border-radius: 11px; font-size: 22px; font-weight: 800; background: var(--panel-solid); border: 1px solid var(--line); color: var(--text); cursor: pointer; font-family: inherit; transition: filter .1s ease, transform .08s ease; }
@@ -340,6 +321,23 @@ input:focus { border-color: var(--orange); }
 }
 @keyframes cd-pop { 0%,100% { transform: scale(1); } 50% { transform: scale(1.12); } }
 
+/* pre-bid intro */
+.intro-head { text-align: center; font-size: 30px; font-weight: 900; }
+.intro-head .intro-total { font-size: 14px; color: var(--muted); font-weight: 700; }
+.intro-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.istat { background: var(--panel-solid); border: 1px solid var(--line); border-radius: 14px; padding: 14px; text-align: center; }
+.istat .istat-label { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; font-weight: 700; }
+.istat .istat-value { display: block; font-size: 34px; font-weight: 900; color: var(--muted); margin: 4px 0; font-variant-numeric: tabular-nums; }
+.istat .istat-bar { height: 8px; border-radius: 4px; background: var(--panel2); overflow: hidden; }
+.istat .istat-bar i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--orange-deep), var(--amber)); transition: width .5s ease; }
+.istat.shown { border-color: var(--orange); }
+.istat.shown .istat-value { color: var(--orange-2); animation: istat-pop .5s ease; }
+@keyframes istat-pop { 0% { transform: scale(.6); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+.order-chip.starts { box-shadow: inset 0 0 0 2px var(--amber); }
+.order-chip.starts .oc-lead { color: var(--amber); }
+.order-chip.flash { animation: flash-chip .9s ease-in-out; }
+@keyframes flash-chip { 0%,100% { box-shadow: inset 0 0 0 2px var(--amber); } 50% { box-shadow: inset 0 0 0 2px var(--amber), 0 0 20px rgba(255,201,77,.8); } }
+
 /* fixed bottom action bar (bid controls float above content) */
 .action-bar {
   position: fixed; left: 0; right: 0; bottom: 0; z-index: 45;
@@ -429,15 +427,6 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       <label>Your name
         <input id="name-input" type="text" maxlength="20" placeholder="e.g. Ash" />
       </label>
-      <div class="field">
-        <div class="field-label">Players (2–5)</div>
-        <div class="seg" id="count-seg">
-          <button type="button" class="seg-btn active" data-n="2">2</button>
-          <button type="button" class="seg-btn" data-n="3">3</button>
-          <button type="button" class="seg-btn" data-n="4">4</button>
-          <button type="button" class="seg-btn" data-n="5">5</button>
-        </div>
-      </div>
       <button type="button" id="btn-create" class="btn primary big">Create game</button>
       <div class="divider"><span>or join a room</span></div>
       <div class="row gap">
@@ -453,9 +442,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   <div id="screen-lobby" class="screen center hidden">
     <div class="card panel lobby">
       <h2 id="lobby-title">Waiting for players</h2>
-      <p class="muted">Share the code — the draft starts when everyone's in.</p>
+      <p class="muted">Share the code — the host starts once 2–5 players join.</p>
       <div class="big-code" id="lobby-code">—-</div>
       <div id="lobby-slots" class="lobby-slots"></div>
+      <div id="lobby-cap" class="muted"></div>
       <div id="lobby-order" class="lobby-order hidden"></div>
       <button type="button" id="btn-start" class="btn primary hidden">Start draft</button>
       <button type="button" id="btn-copy-link" class="btn primary">Copy invite link</button>
@@ -564,12 +554,13 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 
   let state = null;
   let myIndex = null;
-  let chosenCount = 2;
   let bidValue = 1;
   let countdownTimer = null;
   let warnedThisTurn = false;
   let prevToAct = null;
   let poolCache = null;
+  let lastTeamKey = null;   // skip redundant team re-renders
+  let lastBoardKey = null;  // skip redundant board re-renders
 
   const $ = (id) => document.getElementById(id);
   const screens = ['screen-landing', 'screen-lobby', 'screen-countdown', 'screen-ended', 'screen-game', 'screen-done'];
@@ -668,11 +659,11 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   $('mute-btn').addEventListener('click', () => { SFX.toggleMute(); updateMuteIcon(); });
   document.addEventListener('pointerdown', () => SFX.unlock(), { once: false });
   document.addEventListener('mouseover', (e) => {
-    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab, .mute-btn');
+    const el = e.target.closest('.btn, .wh-btn, .tab, .mute-btn');
     if (el && e.relatedTarget && !el.contains(e.relatedTarget)) SFX.hover();
   });
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('.btn, .seg-btn, .wh-btn, .tab');
+    const el = e.target.closest('.btn, .wh-btn, .tab');
     if (el) SFX.pop();
   });
 
@@ -810,17 +801,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   });
 
   // ---------- landing ----------
-  document.querySelectorAll('.seg-btn').forEach((b) => {
-    b.addEventListener('click', () => {
-      chosenCount = parseInt(b.dataset.n, 10);
-      document.querySelectorAll('.seg-btn').forEach((x) => x.classList.toggle('active', x === b));
-    });
-  });
-
   $('btn-create').addEventListener('click', () => {
     if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
     const name = $('name-input').value.trim() || 'Player 1';
-    socket.emit('create', { playerId, name, numPlayers: chosenCount }, (res) => {
+    socket.emit('create', { playerId, name }, (res) => {
       if (!res.ok) return toast(res.error, true);
       myIndex = res.playerIndex;
       show('screen-lobby');
@@ -885,13 +869,20 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   $('pool-search').addEventListener('input', (e) => { if (poolCache) renderPool(poolCache, e.target.value); });
 
   // ---------- render ----------
+  function hideActionBar() {
+    const bar = $('action-bar');
+    bar.classList.add('hidden');
+    document.body.classList.remove('action-active');
+  }
   function render() {
     if (!state) return;
     stopCountdownScreen();
-    if (state.state === 'waiting' || state.state === 'lobby') { renderLobby(); return; }
-    if (state.state === 'countdown') { renderCountdownScreen(); return; }
-    if (state.state === 'ended') { hideReveal(); renderEnded(); return; }
-    if (state.state === 'done') { hideReveal(); renderDone(); return; }
+    stopIntroTimer();
+    if (state.state === 'waiting' || state.state === 'lobby') { stopCountdown(); hideActionBar(); document.body.classList.remove('my-turn'); renderLobby(); return; }
+    if (state.state === 'countdown') { stopCountdown(); hideActionBar(); document.body.classList.remove('my-turn'); hideReveal(); prevToAct = null; renderCountdownScreen(); return; }
+    if (state.state === 'intro') { stopCountdown(); hideActionBar(); document.body.classList.remove('my-turn'); hideReveal(); prevToAct = null; renderIntro(); return; }
+    if (state.state === 'ended') { stopCountdown(); hideActionBar(); document.body.classList.remove('my-turn'); hideReveal(); renderEnded(); return; }
+    if (state.state === 'done') { stopCountdown(); hideActionBar(); document.body.classList.remove('my-turn'); hideReveal(); renderDone(); return; }
     show('screen-game');
     $('game-code').textContent = state.code;
 
@@ -916,20 +907,20 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     $('lobby-code').textContent = state.code;
     const wrap = $('lobby-slots');
     wrap.innerHTML = '';
-    for (let i = 0; i < state.numPlayers; i++) {
-      const pl = state.players[i];
+    state.players.forEach((pl, i) => {
+      if (!pl) return;
       const el = document.createElement('div');
-      el.className = 'lobby-slot' + (pl ? ' filled' : '');
-      el.innerHTML = pl
-        ? `<span class="dot"></span><span class="ls-name">${esc(pl.name)}</span>${i === myIndex ? '<span class="ls-you">you</span>' : ''}`
-        : `<span class="dot"></span><span class="ls-wait">Waiting for player ${i + 1}…</span>`;
+      el.className = 'lobby-slot filled';
+      el.innerHTML = `<span class="dot"></span><span class="ls-name">${esc(pl.name)}</span>${i === myIndex ? '<span class="ls-you">you</span>' : ''}`;
       wrap.appendChild(el);
-    }
+    });
+    const count = state.players.filter((p) => p).length;
+    $('lobby-cap').textContent = `${count} / 5 players · need at least 2 to start`;
 
-    const allIn = state.players.every((p) => p && p.connected);
     const isHost = myIndex === 0;
+    const enough = count >= 2;
     if (state.state === 'lobby') {
-      $('lobby-title').textContent = allIn ? (isHost ? 'Everyone\'s here!' : 'Waiting for the host…') : 'Waiting for players';
+      $('lobby-title').textContent = isHost ? (enough ? 'Everyone\'s here!' : 'Waiting for players') : 'Waiting for the host…';
       const orderEl = $('lobby-order');
       if (state.turnOrder && state.turnOrder.length) {
         const seq = state.turnOrder.map((i) => {
@@ -939,8 +930,8 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
         orderEl.innerHTML = `<div class="order-label">Starting turn order — rotates each round</div><div class="order-row">${seq}</div>`;
         orderEl.classList.remove('hidden');
       }
-      $('btn-start').classList.toggle('hidden', !(allIn && isHost));
-      $('lobby-wait-host').classList.toggle('hidden', !(allIn && !isHost));
+      $('btn-start').classList.toggle('hidden', !(isHost && enough));
+      $('lobby-wait-host').classList.toggle('hidden', !(enough && !isHost));
     } else {
       $('lobby-title').textContent = 'Waiting for players';
       $('lobby-order').classList.add('hidden');
@@ -981,6 +972,107 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     show('screen-ended');
     const name = state.endedBy || 'A player';
     $('ended-msg').innerHTML = `<b>${esc(name)}</b> disconnected — the game has ended.`;
+  }
+
+  // ---------- pre-bid intro (Bid #N → stats one-by-one → opening bidder) ----------
+  let introSeenIndex = -1;
+  let introTimer = null;
+  function stopIntroTimer() { if (introTimer) { clearInterval(introTimer); introTimer = null; } }
+
+  function renderIntro() {
+    show('screen-game');
+    $('game-code').textContent = state.code;
+    if (introSeenIndex !== state.currentIndex) {
+      introSeenIndex = state.currentIndex;
+      setTab('auction');
+    }
+    renderTeam();
+    renderBoard();
+    renderIntroPanel();
+    startIntroTimer();
+  }
+
+  function renderIntroPanel() {
+    const panel = $('auction-panel');
+    const idx = state.currentIndex;
+    const current = state.pokemon[idx];
+    const revealed = (current && current.revealed) ? current.revealed : [];
+    const num = idx + 1;
+    const total = state.numPlayers * 6;
+    const opener = state.introBidder;
+
+    const orderChips = (state.turnOrder || []).map((i, pos) => {
+      const pl = state.players[i];
+      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const starts = i === opener;
+      return `<div class="order-chip ${starts ? 'starts' : ''}" style="border-left-color:${color}">
+        <span class="oc-num">${pos + 1}</span>
+        <span class="oc-name">${esc(pl.name)}${i === myIndex ? ' (you)' : ''}</span>
+        ${starts ? '<span class="oc-lead">starts the bid</span>' : ''}
+      </div>`;
+    });
+
+    const statSlots = [0, 1].map((s) => `
+      <div class="istat" data-i="${s}">
+        <span class="istat-label">?</span>
+        <span class="istat-value">?</span>
+        <div class="istat-bar"><i style="width:0%"></i></div>
+      </div>`).join('');
+
+    panel.innerHTML = `
+      <div class="intro-head">Bid #${num} <span class="intro-total">of ${total}</span></div>
+      <div class="mystery">
+        <div class="mystery-art">?</div>
+        <div class="mystery-name">???</div>
+        <div class="mystery-hint">Identity hidden — 2 stats revealed</div>
+      </div>
+      <div class="intro-stats">${statSlots}</div>
+      <div class="order-strip">
+        <div class="os-label">Bidding order — first bidder highlighted</div>
+        ${orderChips.join('')}
+      </div>
+    `;
+  }
+
+  function startIntroTimer() {
+    stopIntroTimer();
+    if (state.state !== 'intro' || !state.introEnd) return;
+    const offset = state.serverNow - Date.now();
+    const remaining = state.introEnd - (Date.now() + offset);
+    const total = Math.max(1, remaining);
+    const start = Date.now();
+    const current = state.pokemon[state.currentIndex];
+    const revealed = (current && current.revealed) ? current.revealed : [];
+    const panel = $('auction-panel');
+    let nextStat = 0;
+    let bidderShown = false;
+
+    function revealStat(i) {
+      const el = panel.querySelector('.istat[data-i="' + i + '"]');
+      const r = revealed[i];
+      if (!el || !r) return;
+      el.querySelector('.istat-label').textContent = r.label;
+      el.querySelector('.istat-value').textContent = r.value;
+      el.querySelector('.istat-bar i').style.width = Math.min(100, Math.round((r.value / 180) * 100)) + '%';
+      el.classList.add('shown');
+    }
+
+    function tick() {
+      if (!state || state.state !== 'intro') { stopIntroTimer(); return; }
+      const prog = Math.min(1, (Date.now() - start) / total);
+      while (nextStat < 2 && prog >= (nextStat === 0 ? 0.28 : 0.55)) {
+        revealStat(nextStat);
+        nextStat++;
+      }
+      if (!bidderShown && prog >= 0.78) {
+        bidderShown = true;
+        const chip = panel.querySelector('.order-chip.starts');
+        if (chip) chip.classList.add('flash');
+      }
+      if (prog >= 1) stopIntroTimer();
+    }
+    tick();
+    introTimer = setInterval(tick, 50);
   }
 
   function renderTurnBanner() {
@@ -1166,9 +1258,12 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   // ---------- team ----------
   function renderTeam() {
     const panel = $('team-panel');
-    if (state.state !== 'auction' && state.state !== 'reveal' && state.state !== 'done') { panel.innerHTML = ''; return; }
+    if (state.state !== 'auction' && state.state !== 'reveal' && state.state !== 'intro') { panel.innerHTML = ''; lastTeamKey = null; return; }
     const myTeam = state.teams[myIndex];
     const budget = state.budgets[myIndex];
+    const key = budget + '|' + myTeam.map((p) => p.id).join(',');
+    if (key === lastTeamKey) return; // nothing changed since last render
+    lastTeamKey = key;
     const remaining = 6 - myTeam.length;
     const slots = [];
     myTeam.forEach((p) => {
@@ -1195,6 +1290,9 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   function renderBoard() {
     const board = $('board');
     const won = state.pokemon.filter((p) => p.won);
+    const key = won.map((p) => p.id + ':' + p.won.winner + ':' + p.won.price).join('|');
+    if (key === lastBoardKey) return; // nothing changed since last render
+    lastBoardKey = key;
     if (!won.length) {
       board.innerHTML = '<p class="muted">Nothing drafted yet — Pokémon appear here once someone wins them.</p>';
       return;
@@ -1300,34 +1398,25 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     wrap.innerHTML = `
       ${teamsHtml}
       <div class="export-actions" style="grid-column:1/-1">
-        <button class="btn primary" id="btn-copy-team">Copy my team</button>
-        <button class="btn primary" id="btn-download-team">Download my team</button>
+        <button class="btn primary" id="btn-copy-team">Copy Showdown team</button>
         <button class="btn" id="btn-back-home">Back to main menu</button>
       </div>`;
 
     $('btn-back-home').addEventListener('click', () => { if (socket) socket.disconnect(); location.reload(); });
     $('btn-copy-team').addEventListener('click', () => {
-      const text = teamText();
-      navigator.clipboard.writeText(text).then(() => toast('Team copied!')).catch(() => prompt('Copy:', text));
-    });
-    $('btn-download-team').addEventListener('click', () => {
-      const text = teamText();
-      const blob = new Blob([text], { type: 'text/plain' });
-      const a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'my-pokebid-team.txt';
-      a.click();
-      URL.revokeObjectURL(a.href);
+      const text = buildShowdownTeam();
+      navigator.clipboard.writeText(text)
+        .then(() => toast('Showdown team copied!'))
+        .catch(() => toast('Couldn\'t copy — clipboard unavailable.', true));
     });
   }
 
-  function teamText() {
-    const team = state.teams[myIndex];
-    const lines = ['PokéBid Team — ' + (state.players[myIndex] ? state.players[myIndex].name : 'You'), ''];
-    team.forEach((p) => {
-      lines.push(`- ${p.name} (${p.types.join('/')})`);
-    });
-    return lines.join('\n');
+  // ---------- Pokémon Showdown export ----------
+  // Emit the six drafted species as bare Showdown entries (no moves/items).
+  // Each Pokémon must be its own block, separated by a blank line, so that
+  // Showdown's importer creates all six instead of just the first.
+  function buildShowdownTeam() {
+    return state.teams[myIndex].map((p) => p.name).join('\n\n');
   }
 
   // ---------- socket ----------
@@ -1341,10 +1430,9 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     socket.on('connect_error', () => { setConn('No server', 'err'); noServer.classList.remove('hidden'); });
 
     socket.on('state', (s) => {
-      const enteredRoom = state === null;
       state = s;
       myIndex = s.playerIndex;
-      if (enteredRoom) startMusic(); // lobby created → start music
+      if (s.state !== 'waiting') startMusic(); // music begins once the lobby forms
       render();
     });
     socket.on('action', (a) => showActionPopup(a));
@@ -1368,5 +1456,6 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   }
   })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3357f2d6e209337',t:'MTc4ODExMDc0Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33cfc696b20dda1',t:'MTc4ODE4OTI3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
 </html>
