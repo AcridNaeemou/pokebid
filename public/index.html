@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>PokéBid — Blind Bid Teambuilder</title>
+<title>PokéBid</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;700;800;900&display=swap" rel="stylesheet" />
@@ -418,6 +418,30 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 .chat-input-row .btn { padding: 9px 14px; font-size: 14px; }
 body.action-active .chat-fab { bottom: 200px; }
 body.action-active .chat-panel { bottom: 266px; }
+
+/* turn attention flash (overlay that pulses when it becomes your turn) */
+#turn-flash { position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: 0; }
+#turn-flash.show { animation: turn-flash .8s ease-out; }
+@keyframes turn-flash {
+  0% { opacity: 1; box-shadow: inset 0 0 160px rgba(95,217,122,.6); }
+  100% { opacity: 0; box-shadow: inset 0 0 0 rgba(95,217,122,0); }
+}
+
+/* "last bid" callout when it's your turn */
+.last-bid {
+  text-align: center; font-size: 14px; font-weight: 800; color: var(--text);
+  background: rgba(255,201,77,.10); border: 1px solid rgba(255,201,77,.4);
+  border-radius: 12px; padding: 10px 14px;
+}
+.last-bid .lb-amt { color: var(--amber); font-size: 18px; font-variant-numeric: tabular-nums; }
+
+/* big-bid shock highlight on the action popup */
+.action-popup.big { border-color: var(--red); box-shadow: 0 0 24px rgba(255,90,77,.6); animation: big-pop .3s ease; }
+@keyframes big-pop {
+  0% { transform: translateX(-50%) scale(.9); }
+  60% { transform: translateX(-50%) scale(1.07); }
+  100% { transform: translateX(-50%) scale(1); }
+}
 </style>
 </head>
 <body>
@@ -425,14 +449,15 @@ body.action-active .chat-panel { bottom: 266px; }
   <div id="action-popup" class="action-popup"></div>
   <div id="now-playing" class="now-playing"></div>
   <div id="conn" class="conn">Connecting…</div>
+  <div id="turn-flash"></div>
   <button id="mute-btn" class="mute-btn" title="Toggle sound effects">🔊</button>
   <button id="music-btn" class="mute-btn music-btn" title="Toggle music">🎵</button>
   <div id="no-server" class="no-server hidden">
     <div class="ns-card">
       <div class="pokeball" style="width:60px;height:60px"></div>
-      <h2>Not connected to the game server</h2>
-      <p>This looks like a <b>static preview</b> of the page. The real game runs on a live server — open the <b>live preview</b> link (the running PokéBid server) in your browser to play.</p>
-      <p class="muted">If you're seeing this on the live preview, the server may have paused — just tell me and I'll restart it.</p>
+      <h2>Seems like you're disconnected</h2>
+      <p>We can't reach the game server right now. Check your internet connection and refresh the page to try again.</p>
+      <p class="muted">If this keeps happening, the server might be taking a quick break. Give it a minute and try again.</p>
     </div>
   </div>
 
@@ -441,14 +466,14 @@ body.action-active .chat-panel { bottom: 266px; }
     <div class="logo-wrap">
       <div class="pokeball"></div>
       <h1>PokéBid</h1>
-      <p class="welcome"><b>Welcome!</b> Draft a team of <b>6 Pokémon</b> with a <b>$30</b> budget. Each Pokémon stays a complete mystery — you only ever see <b>two random stats</b> before you bid. Bid blind and gamble on greatness.</p>
+      <p class="welcome"><b>Welcome!</b> Draft a team of <b>6 Pokémon</b> with a <b>$30</b> budget. Each Pokémon stays a complete mystery. You only ever see <b>two random stats</b> before you bid. Bid blind and gamble on greatness.</p>
     </div>
     <div class="card panel">
       <div class="rules">
         <div class="rule"><span class="ico">👥</span> 2–5 players · 6 Pokémon each · $30 budget</div>
         <div class="rule"><span class="ico">👁️</span> Only two random stats revealed per Pokémon</div>
-        <div class="rule"><span class="ico">⏱️</span> 30-second bid timer — bid, or fold to skip</div>
-        <div class="rule"><span class="ico">💰</span> Losing bids cost nothing — only the winner pays</div>
+        <div class="rule"><span class="ico">⏱️</span> 30-second bid timer</div>
+        <div class="rule"><span class="ico">💰</span> Only the winner pays</div>
       </div>
     </div>
     <div class="card panel">
@@ -474,8 +499,8 @@ body.action-active .chat-panel { bottom: 266px; }
   <div id="screen-lobby" class="screen center hidden">
     <div class="card panel lobby">
       <h2 id="lobby-title">Waiting for players</h2>
-      <p class="muted">Share the code — the host starts once 2–5 players join.</p>
-      <div class="big-code" id="lobby-code">—-</div>
+      <p class="muted">Share the code. The host starts once 2–5 players join.</p>
+      <div class="big-code" id="lobby-code">????</div>
       <div id="lobby-slots" class="lobby-slots"></div>
       <div id="lobby-cap" class="muted"></div>
       <div id="lobby-order" class="lobby-order hidden"></div>
@@ -489,7 +514,7 @@ body.action-active .chat-panel { bottom: 266px; }
   <!-- COUNTDOWN -->
   <div id="screen-countdown" class="screen center hidden">
     <div class="cd-huge" id="countdown-num">3</div>
-    <div class="muted" style="font-size:18px">Get ready — the draft is about to start!</div>
+    <div class="muted" style="font-size:18px">The draft is about to start!</div>
   </div>
 
   <!-- ENDED -->
@@ -605,6 +630,8 @@ body.action-active .chat-panel { bottom: 266px; }
   let poolCache = null;
   let lastTeamKey = null;   // skip redundant team re-renders
   let lastBoardKey = null;  // skip redundant board re-renders
+  let warLevel = 0;         // escalation level of the current bidding war
+  let warIndex = -1;        // which auction the war level belongs to
 
   const $ = (id) => document.getElementById(id);
   const screens = ['screen-landing', 'screen-lobby', 'screen-countdown', 'screen-ended', 'screen-game', 'screen-done'];
@@ -697,6 +724,36 @@ body.action-active .chat-panel { bottom: 266px; }
       go: () => { tone(523, 523, 0.10, 0.14); tone(784, 784, 0.28, 0.14, 'sine', 0.10); },
       warn: () => { tone(660, 660, 0.12, 0.09, 'square'); tone(660, 660, 0.12, 0.09, 'square', 0.18); },
       win: () => { tone(523, 523, 0.12, 0.10); tone(659, 659, 0.12, 0.10, 'sine', 0.11); tone(784, 784, 0.22, 0.10, 'sine', 0.22); },
+      msg: () => { tone(880, 880, 0.09, 0.05); tone(1318, 1318, 0.13, 0.05, 'sine', 0.08); },
+      bidPress: () => {
+        noise(0.06, 0.09, 'highpass', 2600);
+        tone(523, 523, 0.07, 0.09);
+        tone(659, 659, 0.07, 0.09, 'sine', 0.05);
+        tone(880, 880, 0.14, 0.09, 'sine', 0.10);
+        tone(1318, 1318, 0.10, 0.05, 'sine', 0.16);
+      },
+      shock: () => {
+        tone(320, 70, 0.38, 0.16, 'sawtooth');
+        noise(0.28, 0.14, 'lowpass', 480);
+        tone(1400, 180, 0.26, 0.08, 'square', 0.02);
+      },
+      // Escalating "bidding war" reaction. Higher level = more punchy and
+      // energetic: bigger whoa, more cash, then applause and a crowd cheer.
+      war: (lvl) => {
+        const t = Math.min(lvl, 6);
+        // "whoa" — pitch glides up then back; the swing widens as it escalates
+        const f = 240 + t * 40;
+        tone(f, f * 2.1, 0.20, 0.05 + t * 0.012, 'sine');
+        tone(f * 2.1, f * 0.85, 0.17, 0.045 + t * 0.012, 'sine', 0.18);
+        // cash — a flurry of coin chimes that grows with the ante
+        for (let i = 0; i < 1 + t; i++) {
+          noise(0.05, 0.06 + t * 0.012, 'highpass', 2600 + i * 500, 0.16 + i * 0.06);
+        }
+        // applause and crowd roar from tier 3 up
+        if (t >= 3) noise(0.30 + t * 0.06, 0.05 + t * 0.012, 'bandpass', 1700, 0.34);
+        if (t >= 4) noise(0.42, 0.05 + t * 0.014, 'bandpass', 1000, 0.46);
+        if (t >= 5) { tone(659, 659, 0.10, 0.07); tone(784, 784, 0.10, 0.07, 'sine', 0.09); tone(1046, 1046, 0.18, 0.08, 'sine', 0.18); }
+      },
       unlock: () => { ensure(); },
       toggleMute() { muted = !muted; return muted; },
       get muted() { return muted; },
@@ -712,16 +769,44 @@ body.action-active .chat-panel { bottom: 266px; }
   });
   document.addEventListener('click', (e) => {
     const el = e.target.closest('.btn, .wh-btn, .tab');
-    if (el) SFX.pop();
+    if (el && el.id !== 'btn-bid') SFX.pop(); // bid button plays its own SFX
   });
+
+  function flashTurn() {
+    const f = $('turn-flash');
+    f.classList.remove('show');
+    void f.offsetWidth; // restart the CSS animation
+    f.classList.add('show');
+  }
 
   // ---------- background music (playlist + crossfade) ----------
   // BGM_FILES is populated from the server's /music listing, so dropping any
   // new mp3/ogg/m4a/wav/aac into public/music/ is picked up automatically.
   let BGM_FILES = [];
   let bgmLoaded = false;
-  const BGM_VOL = 0.10; // keep background music quiet
+  const BGM_VOL = 0.05; // keep background music very quiet
   const CROSSFADE = 3.0;
+
+  // Each player shuffles the playlist into their own random order, so nobody
+  // follows the same sequence of songs. `playPos` walks that shuffled order.
+  let playOrder = [];
+  let playPos = 0;
+  function shuffleArr(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+  function nextTrackIndex() {
+    if (!playOrder.length) playOrder = shuffleArr(BGM_FILES);
+    const idx = playOrder[playPos % playOrder.length];
+    playPos++;
+    // Re-shuffle once we've looped through everything, so it stays fresh.
+    if (playPos % playOrder.length === 0 && BGM_FILES.length > 1) playOrder = shuffleArr(BGM_FILES);
+    return idx;
+  }
 
   let musicOn = true;
   let musicStarted = false;
@@ -766,15 +851,14 @@ body.action-active .chat-panel { bottom: 266px; }
       else if (done) done();
     })();
   }
-  function scheduleCrossfade(el, idx) {
+  function scheduleCrossfade(el) {
     el.onended = null;
     if (BGM_FILES.length <= 1) { el.loop = true; return; }
     const onUpdate = () => {
       if (!el.duration || el.currentTime < el.duration - CROSSFADE) return;
       el.removeEventListener('timeupdate', onUpdate);
-      const next = (idx + 1) % BGM_FILES.length;
       const other = el === trackA ? trackB : trackA;
-      playInto(other, next, el);
+      playInto(other, nextTrackIndex(), el);
     };
     el.addEventListener('timeupdate', onUpdate);
     el.addEventListener('error', () => el.removeEventListener('timeupdate', onUpdate));
@@ -788,7 +872,7 @@ body.action-active .chat-panel { bottom: 266px; }
     ramp(el, BGM_VOL, CROSSFADE * 1000);
     if (fadingOut) ramp(fadingOut, 0, CROSSFADE * 1000, () => { try { fadingOut.pause(); } catch (e) {} });
     active = el;
-    scheduleCrossfade(el, idx);
+    scheduleCrossfade(el);
   }
   async function loadBgm() {
     if (bgmLoaded) return;
@@ -809,7 +893,10 @@ body.action-active .chat-panel { bottom: 266px; }
       if (!BGM_FILES.length) return; // no music files yet — stay silent
       trackA = newTrack();
       trackB = newTrack();
-      const start = Math.floor(Math.random() * BGM_FILES.length);
+      // Fresh shuffled order for this player, then start from its first entry.
+      playOrder = shuffleArr(BGM_FILES);
+      playPos = 0;
+      const start = nextTrackIndex();
       trackA.src = BGM_FILES[start];
       trackA.volume = 0;
       showNowPlaying(songName(BGM_FILES[start]));
@@ -817,7 +904,7 @@ body.action-active .chat-panel { bottom: 266px; }
       if (p && p.catch) p.catch(() => {});
       ramp(trackA, BGM_VOL, 1200);
       active = trackA;
-      scheduleCrossfade(trackA, start);
+      scheduleCrossfade(trackA);
     });
   }
   function stopMusic() {
@@ -865,30 +952,37 @@ body.action-active .chat-panel { bottom: 266px; }
     $('cp-swatches').appendChild(b);
   });
 
+  let pendingJoin = null; // room code from an invite link (?join=CODE)
+
   $('btn-create').addEventListener('click', () => {
-    if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
-    const name = $('name-input').value.trim() || 'Player 1';
+    if (!socket || !socket.connected) return toast('Can\'t connect to the server. Please try again.', true);
+    const name = $('name-input').value.trim();
+    if (!name) return toast('Please enter your name.', true);
     socket.emit('create', { playerId, name, color: myColor }, (res) => {
       if (!res.ok) return toast(res.error, true);
       myIndex = res.playerIndex;
-      if (res.color && res.color !== myColor) { myColor = res.color; toast('That color was taken — you got a new one.'); }
       show('screen-lobby');
     });
   });
   $('btn-join').addEventListener('click', () => {
-    if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
-    const code = $('code-input').value.trim().toUpperCase();
+    if (!socket || !socket.connected) return toast('Can\'t connect to the server. Please try again.', true);
+    const code = (pendingJoin || $('code-input').value).trim().toUpperCase();
     if (!code) return toast('Enter a room code.', true);
-    const name = $('name-input').value.trim() || 'Player 2';
+    const name = $('name-input').value.trim();
+    if (!name) return toast('Please enter your name.', true);
     socket.emit('join', { playerId, name, code, color: myColor }, (res) => {
       if (!res.ok) return toast(res.error, true);
       myIndex = res.playerIndex;
-      if (res.color && res.color !== myColor) { myColor = res.color; toast('That color was taken — you got a new one.'); }
+      pendingJoin = null;
       if (state && (state.state === 'auction' || state.state === 'reveal')) show('screen-game');
       else show('screen-lobby');
     });
   });
-  $('name-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-create').click(); });
+  $('name-input').addEventListener('keydown', (e) => {
+    if (e.key !== 'Enter') return;
+    if (pendingJoin) $('btn-join').click();
+    else $('btn-create').click();
+  });
   $('code-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') $('btn-join').click(); });
 
   $('btn-start').addEventListener('click', () => { if (socket) socket.emit('start'); });
@@ -926,7 +1020,7 @@ body.action-active .chat-panel { bottom: 266px; }
       poolCache = await res.json();
       renderPool(poolCache, '');
     } catch (e) {
-      $('pool-grid').innerHTML = '<p class="muted">Couldn\'t load the pool here — open the live preview to browse all Pokémon.</p>';
+      $('pool-grid').innerHTML = '<p class="muted">Couldn\'t load the Pokémon list. Please try again.</p>';
     }
   }
   $('btn-view-pool').addEventListener('click', openPool);
@@ -955,6 +1049,7 @@ body.action-active .chat-panel { bottom: 266px; }
     if (state.state === 'auction' && state.toAct === myIndex && prevToAct !== myIndex) {
       setTab('auction');
       SFX.turn();
+      flashTurn();
     }
     prevToAct = state.toAct;
     document.body.classList.toggle('my-turn', state.state === 'auction' && state.toAct === myIndex);
@@ -993,7 +1088,7 @@ body.action-active .chat-panel { bottom: 266px; }
           const color = playerColor(i);
           return `<span class="order-pill" style="border-color:${color}">${esc(state.players[i].name)}${i === myIndex ? ' (you)' : ''}</span>`;
         }).join('<span class="order-arrow">→</span>');
-        orderEl.innerHTML = `<div class="order-label">Starting turn order — rotates each round</div><div class="order-row">${seq}</div>`;
+        orderEl.innerHTML = `<div class="order-label">Turn order rotates each round</div><div class="order-row">${seq}</div>`;
         orderEl.classList.remove('hidden');
       }
       $('btn-start').classList.toggle('hidden', !(isHost && enough));
@@ -1037,7 +1132,7 @@ body.action-active .chat-panel { bottom: 266px; }
   function renderEnded() {
     show('screen-ended');
     const name = state.endedBy || 'A player';
-    $('ended-msg').innerHTML = `<b>${esc(name)}</b> disconnected — the game has ended.`;
+    $('ended-msg').innerHTML = `<b>${esc(name)}</b> disconnected. The game has ended.`;
   }
 
   // ---------- pre-bid intro (Bid #N → stats one-by-one → opening bidder) ----------
@@ -1090,11 +1185,11 @@ body.action-active .chat-panel { bottom: 266px; }
       <div class="mystery">
         <div class="mystery-art">?</div>
         <div class="mystery-name">???</div>
-        <div class="mystery-hint">Identity hidden — 2 stats revealed</div>
+        <div class="mystery-hint">2 stats revealed</div>
       </div>
       <div class="intro-stats">${statSlots}</div>
       <div class="order-strip">
-        <div class="os-label">Bidding order — first bidder highlighted</div>
+        <div class="os-label">First bidder highlighted</div>
         ${orderChips.join('')}
       </div>
     `;
@@ -1150,7 +1245,18 @@ body.action-active .chat-panel { bottom: 266px; }
     const name = state.players[actor] ? state.players[actor].name : '?';
     banner.classList.remove('hidden');
     banner.classList.toggle('my', isMe);
-    banner.innerHTML = `<span class="dot" style="background:${color}"></span> ${isMe ? 'It\'s YOUR turn — bid or fold!' : `${esc(name)} is deciding…`}`;
+    let msg;
+    if (isMe) {
+      if (state.currentBidder !== null && state.currentBid > 0) {
+        const bn = state.players[state.currentBidder] ? state.players[state.currentBidder].name : '?';
+        msg = `Your turn! Beat <b>${esc(bn)}</b>'s <b>$${state.currentBid}</b>`;
+      } else {
+        msg = 'It\'s your turn!';
+      }
+    } else {
+      msg = `${esc(name)} is deciding…`;
+    }
+    banner.innerHTML = `<span class="dot" style="background:${color}"></span> ${msg}`;
   }
 
   function minBid() { return state.currentBid + 1; }
@@ -1180,11 +1286,17 @@ body.action-active .chat-panel { bottom: 266px; }
 
     const revealed = current && current.revealed ? current.revealed : [];
 
+    // When it's your turn and someone has already bid, call out who you're
+    // trying to beat and at what price.
+    const lastBidHtml = (myTurn && state.currentBidder !== null && state.currentBid > 0)
+      ? `<div class="last-bid">Last bid <b style="color:${playerColor(state.currentBidder)}">${esc(bidderName)}</b> · <span class="lb-amt">$${state.currentBid}</span></div>`
+      : '';
+
     panel.innerHTML = `
       <div class="mystery">
         <div class="mystery-art">?</div>
         <div class="mystery-name">???</div>
-        <div class="mystery-hint">Identity hidden — 2 of 6 stats revealed</div>
+        <div class="mystery-hint">2 of 6 stats revealed</div>
       </div>
 
       <div class="big-stats">
@@ -1200,16 +1312,18 @@ body.action-active .chat-panel { bottom: 266px; }
         <div class="meta-box"><div class="mb-label">Your budget</div><div class="mb-value">$${state.budgets[myIndex]} <span style="font-size:13px;color:var(--muted)">· ${6 - state.teamSizes[myIndex]} slots</span></div></div>
       </div>
 
+      ${lastBidHtml}
+
       <div class="cd-wrap" id="cd-wrap">
         <div class="cd-num" id="cd-num">–</div>
         <div class="cd-col">
           <div class="cd-bar"><i id="cd-bar"></i></div>
-          <div class="cd-label">${myTurn ? 'Your turn — bid or fold!' : `${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} is bidding`}</div>
+          <div class="cd-label">${myTurn ? 'Your turn!' : `${esc(state.players[state.toAct] ? state.players[state.toAct].name : '?')} is bidding`}</div>
         </div>
       </div>
 
       <div class="order-strip">
-        <div class="os-label">Turn order — rotates each round</div>
+        <div class="os-label">Turn order rotates each round</div>
         ${orderChips.join('')}
       </div>
       <div class="winner-line" style="text-align:center">Auction ${state.currentIndex + 1} of ${total}${state.lastWinner !== null && state.currentIndex > 0 ? ` · Last: <b>${esc(state.players[state.lastWinner].name)}</b> won it` : ''}</div>
@@ -1253,7 +1367,7 @@ body.action-active .chat-panel { bottom: 266px; }
     `;
     bindBidControls(lo, hi, canBid);
     const bidBtn = bar.querySelector('#btn-bid');
-    if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid && socket) socket.emit('bid', bidValue); });
+    if (bidBtn) bidBtn.addEventListener('click', () => { if (canBid && socket) { SFX.bidPress(); socket.emit('bid', bidValue); } });
     const foldBtn = bar.querySelector('#btn-fold');
     if (foldBtn) foldBtn.addEventListener('click', () => { if (socket) socket.emit('fold'); });
   }
@@ -1278,7 +1392,7 @@ body.action-active .chat-panel { bottom: 266px; }
       set(parseInt(d, 10));
     });
     input.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') { e.preventDefault(); if (canBid && socket) socket.emit('bid', bidValue); }
+      if (e.key === 'Enter') { e.preventDefault(); if (canBid && socket) { SFX.bidPress(); socket.emit('bid', bidValue); } }
       if (e.key === 'ArrowUp') { e.preventDefault(); set(bidValue + 1); }
       if (e.key === 'ArrowDown') { e.preventDefault(); set(bidValue - 1); }
     });
@@ -1360,7 +1474,7 @@ body.action-active .chat-panel { bottom: 266px; }
     if (key === lastBoardKey) return; // nothing changed since last render
     lastBoardKey = key;
     if (!won.length) {
-      board.innerHTML = '<p class="muted">Nothing drafted yet — Pokémon appear here once someone wins them.</p>';
+      board.innerHTML = '<p class="muted">Nothing drafted yet. Pokémon appear here once someone wins them.</p>';
       return;
     }
     board.innerHTML = won.map((p) => {
@@ -1473,7 +1587,7 @@ body.action-active .chat-panel { bottom: 266px; }
       const text = buildShowdownTeam();
       navigator.clipboard.writeText(text)
         .then(() => toast('Showdown team copied!'))
-        .catch(() => toast('Couldn\'t copy — clipboard unavailable.', true));
+        .catch(() => toast('Couldn\'t copy your team.', true));
     });
   }
 
@@ -1510,6 +1624,7 @@ body.action-active .chat-panel { bottom: 266px; }
     if (chatMessages.length > CHAT_MAX) chatMessages.shift();
     renderChatMsgs();
     if (!chatOpen && !m.sys && m.player !== myIndex) { chatUnread++; updateChatBadge(); }
+    if (!m.sys && m.player !== myIndex) SFX.msg(); // ding on incoming messages
   }
   function openChat() {
     chatOpen = true;
@@ -1550,25 +1665,42 @@ body.action-active .chat-panel { bottom: 266px; }
     socket.on('state', (s) => {
       state = s;
       myIndex = s.playerIndex;
+      // New Pokémon up for auction → reset the bidding-war escalation.
+      if (s.currentIndex !== warIndex) { warIndex = s.currentIndex; warLevel = 0; }
       if (s.state !== 'waiting') startMusic(); // music begins once the lobby forms
       $('chat-fab').classList.remove('hidden'); // chat is available once in a room
       render();
     });
     socket.on('chat', (m) => addChatMsg(m));
-    socket.on('action', (a) => showActionPopup(a));
+    socket.on('action', (a) => {
+      showActionPopup(a);
+      if (a.type === 'bid' && !a.auto) {
+        // Every manual raise escalates the bidding-war reaction.
+        warLevel++;
+        SFX.war(warLevel);
+        // Extra shock + popup highlight when someone bids more than half their
+        // remaining budget (and at least $5), layered over the escalation.
+        if (state && state.budgets && a.amount >= 5 && a.amount > state.budgets[a.player] / 2) {
+          SFX.shock();
+          const popup = $('action-popup');
+          popup.classList.add('big');
+          clearTimeout(popup._bigTimer);
+          popup._bigTimer = setTimeout(() => popup.classList.remove('big'), 600);
+        }
+      }
+    });
     socket.on('error', (msg) => toast(msg, true));
     socket.on('connect', () => {
+      // Invite link (?join=CODE): pre-fill the code and prompt for a name, then
+      // the player joins directly (Enter or the Join button) — no manual code.
       const params = new URLSearchParams(location.search);
       const joinCode = params.get('join');
-      if (joinCode && state === null) {
-        $('code-input').value = joinCode;
-        const name = $('name-input').value.trim() || 'Player 2';
-        socket.emit('join', { playerId, name, code: joinCode.toUpperCase(), color: myColor }, (res) => {
-          if (!res.ok) return toast(res.error, true);
-          myIndex = res.playerIndex;
-          if (res.color && res.color !== myColor) myColor = res.color;
-          show('screen-lobby');
-        });
+      if (joinCode && state === null && !pendingJoin) {
+        pendingJoin = joinCode.toUpperCase();
+        $('code-input').value = pendingJoin;
+        $('name-input').placeholder = 'Enter your name to join…';
+        $('name-input').focus();
+        toast('You\'ve been invited to room ' + pendingJoin + '! Enter a name and press Enter.');
       }
     });
   } else {
@@ -1577,5 +1709,6 @@ body.action-active .chat-panel { bottom: 266px; }
   }
   })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a341b9c50b2208d1',t:'MTc4ODIzODk3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a341f38d9d77e2f7',t:'MTc4ODI0MTM0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
 </html>
