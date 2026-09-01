@@ -80,13 +80,10 @@ function rotateLeft(arr) {
   return arr.slice(1).concat(arr[0]);
 }
 
-// Return the requested color if it's in the palette and still free; otherwise
-// hand back the first available color so players never collide.
-function normalizeColor(color, taken) {
-  const wanted = PLAYER_PALETTE.includes(color) ? color : null;
-  const candidates = wanted ? [wanted, ...PLAYER_PALETTE] : PLAYER_PALETTE;
-  for (const c of candidates) if (!taken.includes(c)) return c;
-  return PLAYER_PALETTE[0];
+// Validate a requested color. Returns the color if it's a legal palette entry,
+// otherwise the first palette color (used as a fallback for the host only).
+function validColor(color) {
+  return PLAYER_PALETTE.includes(color) ? color : PLAYER_PALETTE[0];
 }
 
 function pickRevealed() {
@@ -106,12 +103,16 @@ function buildRoster(numPlayers) {
 }
 
 function maxBidFor(room, i) {
-  const owned = room.teams[i].length;
-  if (owned >= TEAM_SIZE) return 0;
-  return Math.max(0, room.budgets[i] - (TEAM_SIZE - owned - 1)); // keep $1 per remaining slot
+  // No forced reserve: a player may wager their entire remaining budget.
+  if (room.teams[i].length >= TEAM_SIZE) return 0;
+  return Math.max(0, room.budgets[i]);
 }
 
-function inAuction(room, i) { return !room.folded[i] && room.teams[i].length < TEAM_SIZE; }
+function inAuction(room, i) {
+  // Out of the auction if they've folded, their team is full, or they're broke
+  // (no money left to bid with — they auto-fold every subsequent auction).
+  return !room.folded[i] && room.teams[i].length < TEAM_SIZE && room.budgets[i] > 0;
+}
 
 function createRoom(playerId, name, color) {
   const code = newCode();
@@ -143,7 +144,7 @@ function createRoom(playerId, name, color) {
     endedBy: null,
     lastActivity: Date.now(),
   };
-  room.players.push({ id: playerId, name: name || 'Player 1', connected: true, socketId: null, color: normalizeColor(color, []) });
+  room.players.push({ id: playerId, name: name || 'Player 1', connected: true, socketId: null, color: validColor(color) });
   rooms.set(code, room);
   return room;
 }
@@ -297,6 +298,12 @@ function advanceTurn(room) {
       if (!resolveAuction(room)) room.state = 'done';
       return;
     }
+    if (idx === room.currentBidder) {
+      // We've come all the way around: everyone else is folded or broke, so
+      // the current bidder wins instead of outbidding themselves.
+      if (!resolveAuction(room)) room.state = 'done';
+      return;
+    }
     if (maxBidFor(room, idx) > room.currentBid) {
       room.toAct = idx;
       setTurnTimer(room);
@@ -349,25 +356,43 @@ function startAuction(room) {
   beginAuction(room);
 }
 
+// Hand the remaining Pokémon out to the given players (round-robin) so every
+// team still reaches 6. Each costs $1 if the player can afford it, else $0.
+function fillRemaining(room, players) {
+  const total = TEAM_SIZE * room.players.length;
+  let pi = 0;
+  while (room.currentIndex < total) {
+    const idx = players[pi % players.length];
+    if (room.teams[idx].length < TEAM_SIZE) {
+      const p = room.roster[room.currentIndex];
+      const price = room.budgets[idx] >= 1 ? 1 : 0;
+      p.won = { winner: idx, price };
+      room.budgets[idx] -= price;
+      room.teams[idx].push(p);
+      room.currentIndex += 1;
+      room.lastWinner = idx;
+    }
+    pi += 1;
+  }
+  chatSystem(room, 'Remaining Pokémon were assigned to fill teams');
+}
+
 function nextAuction(room) {
   if (room.currentIndex >= TEAM_SIZE * room.players.length) { room.state = 'done'; return; }
-  // If only one player still has open slots, batch-award the rest at $1.
+
+  // Players who still need Pokémon.
   const open = [];
   for (let i = 0; i < room.players.length; i++) if (room.teams[i].length < TEAM_SIZE) open.push(i);
-  if (open.length === 1) {
-    const p0 = open[0];
-    while (room.currentIndex < TEAM_SIZE * room.players.length) {
-      const p = room.roster[room.currentIndex];
-      p.won = { winner: p0, price: 1 };
-      room.budgets[p0] -= 1;
-      room.teams[p0].push(p);
-      room.currentIndex += 1;
-    }
-    room.lastWinner = p0;
-    chatSystem(room, room.players[p0].name + ' won the remaining Pokémon for $1 each');
+
+  // If only one player still has open slots, or nobody left can afford a bid
+  // (everyone with open slots is broke), fill the rest so the draft completes.
+  const anyoneCanBid = open.some((i) => room.budgets[i] > 0);
+  if (open.length === 1 || !anyoneCanBid) {
+    fillRemaining(room, open);
     room.state = 'done';
     return;
   }
+
   // Rotate the turn order one step forward each round.
   room.turnOrder = rotateLeft(room.turnOrder);
   beginAuction(room);
@@ -382,7 +407,8 @@ io.on('connection', (socket) => {
   socket.on('create', (payload, ack) => {
     try {
       const playerId = (payload && payload.playerId) || crypto.randomUUID();
-      const name = (payload && payload.name) || '';
+      const name = String((payload && payload.name) || '').trim();
+      if (!name) { if (ack) ack({ ok: false, error: 'Please enter your name.' }); return; }
       const color = (payload && payload.color) || '';
       const room = createRoom(playerId, name, color);
       room.players[0].socketId = socket.id;
@@ -400,13 +426,14 @@ io.on('connection', (socket) => {
     try {
       const code = String((payload && payload.code) || '').toUpperCase().trim();
       const playerId = (payload && payload.playerId) || crypto.randomUUID();
-      const name = (payload && payload.name) || '';
+      const name = String((payload && payload.name) || '').trim();
       const room = rooms.get(code);
       if (!room) { if (ack) ack({ ok: false, error: 'Room not found.' }); return; }
       if (room.state !== 'waiting' && room.state !== 'lobby') {
         if (ack) ack({ ok: false, error: 'This game has already started.' });
         return;
       }
+      if (!name) { if (ack) ack({ ok: false, error: 'Please enter your name.' }); return; }
 
       let playerIndex = room.players.findIndex((p) => p && p.id === playerId);
       let isNew = false;
@@ -415,9 +442,14 @@ io.on('connection', (socket) => {
           if (ack) ack({ ok: false, error: 'This room is full.' });
           return;
         }
-        const taken = room.players.filter((p) => p).map((p) => p.color);
         const color = (payload && payload.color) || '';
-        room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null, color: normalizeColor(color, taken) });
+        // If the requested color is already taken, reject — do NOT reassign.
+        const taken = room.players.filter((p) => p).map((p) => p.color);
+        if (PLAYER_PALETTE.includes(color) && taken.includes(color)) {
+          if (ack) ack({ ok: false, error: 'That color is taken — please choose another.' });
+          return;
+        }
+        room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null, color: validColor(color) });
         playerIndex = room.players.length - 1;
         isNew = true;
       }
@@ -479,7 +511,7 @@ io.on('connection', (socket) => {
     if (!Number.isInteger(amt)) { socket.emit('error', 'Bids must be whole numbers.'); return; }
     if (amt <= room.currentBid) { socket.emit('error', 'Bid must be higher than the current bid.'); return; }
     if (room.teams[idx].length >= TEAM_SIZE) { socket.emit('error', 'Your team is full.'); return; }
-    if (amt > maxBidFor(room, idx)) { socket.emit('error', "You can't afford that (need to keep $1 per remaining slot)."); return; }
+    if (amt > maxBidFor(room, idx)) { socket.emit('error', "You can't afford that bid."); return; }
 
     room.currentBid = amt;
     room.currentBidder = idx;
