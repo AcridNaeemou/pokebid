@@ -97,7 +97,7 @@ function buildRoster(numPlayers) {
   for (let i = 0; i < total; i++) {
     const idx = Math.floor(Math.random() * pool.length);
     const p = pool.splice(idx, 1)[0];
-    roster.push({ id: p.id, name: p.name, types: p.types, base: p.base, revealedStats: pickRevealed(), won: null });
+    roster.push({ id: p.id, name: p.name, types: p.types, base: p.base, revealedStats: pickRevealed(), won: null, passed: false });
   }
   return roster;
 }
@@ -112,6 +112,17 @@ function inAuction(room, i) {
   // Out of the auction if they've folded, their team is full, or they're broke
   // (no money left to bid with — they auto-fold every subsequent auction).
   return !room.folded[i] && room.teams[i].length < TEAM_SIZE && room.budgets[i] > 0;
+}
+
+// True when `i` is the only player who can still bid (the last one with money
+// and an open slot). In that case the opening-bidder-must-bid rule is relaxed
+// so they can pass on Pokémon they don't want.
+function isSoleBidder(room, i) {
+  if (!inAuction(room, i)) return false;
+  for (let j = 0; j < room.players.length; j++) {
+    if (j !== i && inAuction(room, j)) return false;
+  }
+  return true;
 }
 
 function createRoom(playerId, name, color) {
@@ -446,7 +457,7 @@ io.on('connection', (socket) => {
         // If the requested color is already taken, reject — do NOT reassign.
         const taken = room.players.filter((p) => p).map((p) => p.color);
         if (PLAYER_PALETTE.includes(color) && taken.includes(color)) {
-          if (ack) ack({ ok: false, error: 'That color is taken — please choose another.' });
+          if (ack) ack({ ok: false, error: 'That color is taken. Please choose another.' });
           return;
         }
         room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null, color: validColor(color) });
@@ -528,7 +539,29 @@ io.on('connection', (socket) => {
     if (!room || room.state !== 'auction') return;
     if (idx !== room.toAct) { socket.emit('error', 'Not your turn.'); return; }
     if (room.currentBidder === null && room.currentBid === 0) {
-      socket.emit('error', 'You must open the bidding with a bid.');
+      // Normally the opening bidder must bid. But if this player is the only
+      // one left with money, let them pass on Pokémon they don't want instead
+      // of being forced to spend $1 on everything.
+      if (!isSoleBidder(room, idx)) {
+        socket.emit('error', 'You must open the bidding with a bid.');
+        return;
+      }
+      const p = room.roster[room.currentIndex];
+      if (!p || p.won || p.passed) {
+        // They already skipped this one once — it has come back around, so it
+        // must be taken now (this guarantees the draft always completes).
+        socket.emit('error', 'You already passed on this Pokémon. Please bid on it.');
+        return;
+      }
+      p.passed = true;
+      // Re-queue this Pokémon to the back so the next one comes up now.
+      room.roster.splice(room.currentIndex, 1);
+      room.roster.push(p);
+      touch(room);
+      emitAction(room, { type: 'fold', player: idx, name: room.players[idx].name, pass: true, pokemon: p.name });
+      chatSystem(room, room.players[idx].name + ' passed on ' + p.name);
+      beginAuction(room);
+      broadcast(room);
       return;
     }
     room.folded[idx] = true;
@@ -569,7 +602,7 @@ io.on('connection', (socket) => {
         clearRevealTimer(room);
         clearCountdownTimer(room);
         clearIntroTimer(room);
-        chatSystem(room, pl.name + ' left — the game has ended.');
+        chatSystem(room, pl.name + ' left. The game has ended.');
       }
       broadcast(room);
     }
