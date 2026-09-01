@@ -52,6 +52,10 @@ const INTRO_MS = Math.round(parseFloat(process.env.INTRO_SECONDS || '4') * 1000)
 const STAT_KEYS = ['hp', 'atk', 'def', 'spa', 'spd', 'spe'];
 const STAT_LABELS = { hp: 'HP', atk: 'Atk', def: 'Def', spa: 'SpA', spd: 'SpD', spe: 'Spe' };
 
+// Player name colors. Each player picks one when they enter their name; the
+// server guarantees no two players in the same room share a color.
+const PLAYER_PALETTE = ['#ff7a1a', '#4da3ff', '#5fd97a', '#b78bff', '#ff7ab8', '#ffc94d', '#ff5a4d', '#e8e4de'];
+
 const rooms = new Map();
 
 function randCode() {
@@ -74,6 +78,15 @@ function shuffle(arr) {
 function rotateLeft(arr) {
   if (arr.length <= 1) return arr.slice();
   return arr.slice(1).concat(arr[0]);
+}
+
+// Return the requested color if it's in the palette and still free; otherwise
+// hand back the first available color so players never collide.
+function normalizeColor(color, taken) {
+  const wanted = PLAYER_PALETTE.includes(color) ? color : null;
+  const candidates = wanted ? [wanted, ...PLAYER_PALETTE] : PLAYER_PALETTE;
+  for (const c of candidates) if (!taken.includes(c)) return c;
+  return PLAYER_PALETTE[0];
 }
 
 function pickRevealed() {
@@ -100,7 +113,7 @@ function maxBidFor(room, i) {
 
 function inAuction(room, i) { return !room.folded[i] && room.teams[i].length < TEAM_SIZE; }
 
-function createRoom(playerId, name) {
+function createRoom(playerId, name, color) {
   const code = newCode();
   const room = {
     code,
@@ -130,7 +143,7 @@ function createRoom(playerId, name) {
     endedBy: null,
     lastActivity: Date.now(),
   };
-  room.players.push({ id: playerId, name: name || 'Player 1', connected: true, socketId: null });
+  room.players.push({ id: playerId, name: name || 'Player 1', connected: true, socketId: null, color: normalizeColor(color, []) });
   rooms.set(code, room);
   return room;
 }
@@ -160,7 +173,7 @@ function buildView(room, playerIndex) {
     code: room.code,
     numPlayers: room.players.length,
     playerIndex,
-    players: room.players.map((pl) => (pl ? { name: pl.name, connected: pl.connected } : null)),
+    players: room.players.map((pl) => (pl ? { name: pl.name, connected: pl.connected, color: pl.color } : null)),
     turnOrder: room.turnOrder,
     budgets: room.budgets,
     teamSizes: room.teams.map((t) => t.length),
@@ -201,6 +214,11 @@ function emitAction(room, action) {
   io.to(room.code).emit('action', action);
 }
 
+// Push a system chat message (join/leave/award notices) to the whole room.
+function chatSystem(room, text) {
+  io.to(room.code).emit('chat', { sys: true, text, ts: Date.now() });
+}
+
 // ---------- Auction flow ----------
 function award(room, winner, price) {
   const p = room.roster[room.currentIndex];
@@ -210,6 +228,7 @@ function award(room, winner, price) {
   room.currentIndex += 1;
   room.lastWinner = winner;
   room.lastAward = { winner, price, pokemon: { id: p.id, name: p.name, types: p.types, base: p.base } };
+  chatSystem(room, room.players[winner].name + ' won ' + p.name + ' for $' + price);
 
   clearTurnTimer(room);
   clearRevealTimer(room);
@@ -345,6 +364,7 @@ function nextAuction(room) {
       room.currentIndex += 1;
     }
     room.lastWinner = p0;
+    chatSystem(room, room.players[p0].name + ' won the remaining Pokémon for $1 each');
     room.state = 'done';
     return;
   }
@@ -363,12 +383,13 @@ io.on('connection', (socket) => {
     try {
       const playerId = (payload && payload.playerId) || crypto.randomUUID();
       const name = (payload && payload.name) || '';
-      const room = createRoom(playerId, name);
+      const color = (payload && payload.color) || '';
+      const room = createRoom(playerId, name, color);
       room.players[0].socketId = socket.id;
       socket.data.roomCode = room.code;
       socket.data.playerIndex = 0;
       socket.join(room.code);
-      if (ack) ack({ ok: true, code: room.code, playerIndex: 0, playerId });
+      if (ack) ack({ ok: true, code: room.code, playerIndex: 0, playerId, color: room.players[0].color });
       broadcast(room);
     } catch (e) {
       if (ack) ack({ ok: false, error: String(e) });
@@ -394,7 +415,9 @@ io.on('connection', (socket) => {
           if (ack) ack({ ok: false, error: 'This room is full.' });
           return;
         }
-        room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null });
+        const taken = room.players.filter((p) => p).map((p) => p.color);
+        const color = (payload && payload.color) || '';
+        room.players.push({ id: playerId, name: name || 'Player ' + (room.players.length + 1), connected: true, socketId: null, color: normalizeColor(color, taken) });
         playerIndex = room.players.length - 1;
         isNew = true;
       }
@@ -415,7 +438,8 @@ io.on('connection', (socket) => {
         }
       }
 
-      if (ack) ack({ ok: true, code, playerIndex, playerId });
+      if (isNew) chatSystem(room, pl.name + ' joined');
+      if (ack) ack({ ok: true, code, playerIndex, playerId, color: pl.color });
       broadcast(room);
     } catch (e) {
       if (ack) ack({ ok: false, error: String(e) });
@@ -482,6 +506,18 @@ io.on('connection', (socket) => {
     broadcast(room);
   });
 
+  socket.on('chat', (text) => {
+    const code = socket.data.roomCode;
+    const idx = socket.data.playerIndex;
+    const room = rooms.get(code);
+    if (!room) return;
+    const pl = room.players[idx];
+    if (!pl) return;
+    const msg = String(text || '').trim().slice(0, 200);
+    if (!msg) return;
+    io.to(code).emit('chat', { player: idx, name: pl.name, text: msg, ts: Date.now() });
+  });
+
   socket.on('disconnect', () => {
     const code = socket.data.roomCode;
     const idx = socket.data.playerIndex;
@@ -501,6 +537,7 @@ io.on('connection', (socket) => {
         clearRevealTimer(room);
         clearCountdownTimer(room);
         clearIntroTimer(room);
+        chatSystem(room, pl.name + ' left — the game has ended.');
       }
       broadcast(room);
     }

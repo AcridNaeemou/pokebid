@@ -390,6 +390,34 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 .pool-item .type-chip { font-size: 9px; padding: 1px 6px; }
 
 .export-actions { display: flex; gap: 10px; justify-content: center; padding: 0 22px 30px; flex-wrap: wrap; }
+
+/* name-color picker */
+.color-pick { display: flex; flex-direction: column; gap: 8px; text-align: left; }
+.cp-label { font-size: 13px; color: var(--muted); font-weight: 600; }
+.cp-swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.cp-swatch { width: 30px; height: 30px; border-radius: 50%; cursor: pointer; border: 3px solid transparent; transition: transform .1s ease; padding: 0; }
+.cp-swatch:hover { transform: scale(1.12); }
+.cp-swatch.sel { border-color: #fff; box-shadow: 0 0 0 2px var(--orange); }
+
+/* chat */
+.chat-fab { position: fixed; right: 16px; bottom: 16px; z-index: 80; width: 54px; height: 54px; border-radius: 50%; background: linear-gradient(180deg, var(--orange-2), var(--orange-deep)); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 22px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.45); border: none; transition: transform .12s ease; }
+.chat-fab:hover { transform: translateY(-2px); }
+.chat-badge { position: absolute; top: -4px; right: -4px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 999px; background: var(--red); color: #fff; font-size: 12px; font-weight: 800; display: flex; align-items: center; justify-content: center; box-shadow: 0 2px 6px rgba(0,0,0,.4); }
+.chat-panel { position: fixed; right: 16px; bottom: 82px; z-index: 79; width: 300px; max-width: calc(100vw - 32px); background: var(--panel-solid); border: 1px solid var(--line); border-radius: 16px; box-shadow: 0 20px 60px rgba(0,0,0,.5); display: flex; flex-direction: column; overflow: hidden; }
+.chat-head { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-bottom: 1px solid var(--line); font-weight: 800; }
+.chat-close { background: none; border: none; color: var(--muted); font-size: 22px; cursor: pointer; line-height: 1; padding: 0 2px; }
+.chat-close:hover { color: var(--text); }
+.chat-msgs { height: 250px; overflow-y: auto; padding: 10px 12px; display: flex; flex-direction: column; gap: 7px; }
+.chat-msg { display: flex; flex-direction: column; }
+.chat-msg .cm-name { font-weight: 800; font-size: 12px; }
+.chat-msg .cm-text { font-size: 13px; color: var(--text); word-break: break-word; }
+.chat-msg.sys { align-items: center; text-align: center; }
+.chat-msg.sys .cm-text { color: var(--muted); font-size: 12px; }
+.chat-input-row { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+.chat-input-row input { flex: 1; padding: 9px 12px; font-size: 14px; }
+.chat-input-row .btn { padding: 9px 14px; font-size: 14px; }
+body.action-active .chat-fab { bottom: 200px; }
+body.action-active .chat-panel { bottom: 266px; }
 </style>
 </head>
 <body>
@@ -427,6 +455,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       <label>Your name
         <input id="name-input" type="text" maxlength="20" placeholder="e.g. Ash" />
       </label>
+      <div class="color-pick">
+        <div class="cp-label">Your color</div>
+        <div class="cp-swatches" id="cp-swatches"></div>
+      </div>
       <button type="button" id="btn-create" class="btn primary big">Create game</button>
       <div class="divider"><span>or join a room</span></div>
       <div class="row gap">
@@ -497,6 +529,17 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   <!-- FIXED BID ACTION BAR -->
   <div id="action-bar" class="action-bar hidden"></div>
 
+  <!-- CHAT -->
+  <button id="chat-fab" class="chat-fab hidden" title="Chat">💬<span id="chat-badge" class="chat-badge hidden"></span></button>
+  <div id="chat-panel" class="chat-panel hidden">
+    <div class="chat-head"><span>Chat</span><button id="chat-close" class="chat-close">×</button></div>
+    <div id="chat-msgs" class="chat-msgs"></div>
+    <div class="chat-input-row">
+      <input id="chat-input" type="text" maxlength="200" placeholder="Say something…" />
+      <button id="chat-send" class="btn primary">Send</button>
+    </div>
+  </div>
+
   <!-- DONE -->
   <div id="screen-done" class="screen hidden">
     <div class="done-head center">
@@ -546,7 +589,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     rock: '#B6A136', ghost: '#735797', dragon: '#6F35FC', dark: '#705746',
     steel: '#B7B7CE', fairy: '#D685AD',
   };
-  const PLAYER_COLORS = ['#ff7a1a', '#4da3ff', '#5fd97a', '#b78bff', '#ff7ab8'];
+  const PALETTE = ['#ff7a1a', '#4da3ff', '#5fd97a', '#b78bff', '#ff7ab8', '#ffc94d', '#ff5a4d', '#e8e4de'];
   const ART = (id) => `https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/other/official-artwork/${id}.png`;
 
   let playerId = localStorage.getItem('pokedraft_playerId');
@@ -554,6 +597,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 
   let state = null;
   let myIndex = null;
+  let myColor = PALETTE[0];
   let bidValue = 1;
   let countdownTimer = null;
   let warnedThisTurn = false;
@@ -585,6 +629,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   function statBar(val) {
     const pct = Math.min(100, Math.round((val / 180) * 100));
     return `<div class="stat-bar"><i style="width:${pct}%"></i></div>`;
+  }
+  function playerColor(i) {
+    const p = state && state.players ? state.players[i] : null;
+    return (p && p.color) || PALETTE[i % PALETTE.length];
   }
 
   // ---------- sound effects ----------
@@ -801,12 +849,29 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   });
 
   // ---------- landing ----------
+  // Build the name-color swatch picker.
+  PALETTE.forEach((c, i) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'cp-swatch' + (i === 0 ? ' sel' : '');
+    b.style.background = c;
+    b.title = 'Player color';
+    b.addEventListener('click', () => {
+      myColor = c;
+      $('cp-swatches').querySelectorAll('.cp-swatch').forEach((el) => el.classList.remove('sel'));
+      b.classList.add('sel');
+      SFX.pop();
+    });
+    $('cp-swatches').appendChild(b);
+  });
+
   $('btn-create').addEventListener('click', () => {
     if (!socket || !socket.connected) return toast('Not connected — open the live preview.', true);
     const name = $('name-input').value.trim() || 'Player 1';
-    socket.emit('create', { playerId, name }, (res) => {
+    socket.emit('create', { playerId, name, color: myColor }, (res) => {
       if (!res.ok) return toast(res.error, true);
       myIndex = res.playerIndex;
+      if (res.color && res.color !== myColor) { myColor = res.color; toast('That color was taken — you got a new one.'); }
       show('screen-lobby');
     });
   });
@@ -815,9 +880,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     const code = $('code-input').value.trim().toUpperCase();
     if (!code) return toast('Enter a room code.', true);
     const name = $('name-input').value.trim() || 'Player 2';
-    socket.emit('join', { playerId, name, code }, (res) => {
+    socket.emit('join', { playerId, name, code, color: myColor }, (res) => {
       if (!res.ok) return toast(res.error, true);
       myIndex = res.playerIndex;
+      if (res.color && res.color !== myColor) { myColor = res.color; toast('That color was taken — you got a new one.'); }
       if (state && (state.state === 'auction' || state.state === 'reveal')) show('screen-game');
       else show('screen-lobby');
     });
@@ -911,7 +977,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       if (!pl) return;
       const el = document.createElement('div');
       el.className = 'lobby-slot filled';
-      el.innerHTML = `<span class="dot"></span><span class="ls-name">${esc(pl.name)}</span>${i === myIndex ? '<span class="ls-you">you</span>' : ''}`;
+      el.innerHTML = `<span class="dot"></span><span class="ls-name" style="color:${playerColor(i)}">${esc(pl.name)}</span>${i === myIndex ? '<span class="ls-you">you</span>' : ''}`;
       wrap.appendChild(el);
     });
     const count = state.players.filter((p) => p).length;
@@ -924,7 +990,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       const orderEl = $('lobby-order');
       if (state.turnOrder && state.turnOrder.length) {
         const seq = state.turnOrder.map((i) => {
-          const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+          const color = playerColor(i);
           return `<span class="order-pill" style="border-color:${color}">${esc(state.players[i].name)}${i === myIndex ? ' (you)' : ''}</span>`;
         }).join('<span class="order-arrow">→</span>');
         orderEl.innerHTML = `<div class="order-label">Starting turn order — rotates each round</div><div class="order-row">${seq}</div>`;
@@ -1003,7 +1069,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 
     const orderChips = (state.turnOrder || []).map((i, pos) => {
       const pl = state.players[i];
-      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const color = playerColor(i);
       const starts = i === opener;
       return `<div class="order-chip ${starts ? 'starts' : ''}" style="border-left-color:${color}">
         <span class="oc-num">${pos + 1}</span>
@@ -1080,7 +1146,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     if (state.state !== 'auction' || state.toAct === null) { banner.classList.add('hidden'); return; }
     const actor = state.toAct;
     const isMe = actor === myIndex;
-    const color = PLAYER_COLORS[actor % PLAYER_COLORS.length];
+    const color = playerColor(actor);
     const name = state.players[actor] ? state.players[actor].name : '?';
     banner.classList.remove('hidden');
     banner.classList.toggle('my', isMe);
@@ -1100,7 +1166,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
 
     const orderChips = (state.turnOrder || []).map((i, pos) => {
       const pl = state.players[i];
-      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const color = playerColor(i);
       const out = state.folded[i] || state.teamSizes[i] >= 6;
       const leading = state.currentBidder === i;
       const acting = state.toAct === i;
@@ -1298,7 +1364,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       return;
     }
     board.innerHTML = won.map((p) => {
-      const color = PLAYER_COLORS[p.won.winner % PLAYER_COLORS.length];
+      const color = playerColor(p.won.winner);
       const owner = state.players[p.won.winner] ? state.players[p.won.winner].name : '?';
       return `
         <div class="card-slot" style="border-color:${color}">
@@ -1318,7 +1384,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   function showReveal(award) {
     const isMe = award.winner === myIndex;
     const winnerName = state.players[award.winner] ? state.players[award.winner].name : '?';
-    const color = PLAYER_COLORS[award.winner % PLAYER_COLORS.length];
+    const color = playerColor(award.winner);
     const p = award.pokemon;
 
     if (isMe) SFX.win();
@@ -1379,7 +1445,7 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     const wrap = $('done-teams');
     const teamsHtml = state.teams.map((team, i) => {
       const owner = state.players[i] ? state.players[i].name : 'Player ' + (i + 1);
-      const color = PLAYER_COLORS[i % PLAYER_COLORS.length];
+      const color = playerColor(i);
       const cards = team.map((p) => `
         <div class="done-card">
           <img src="${ART(p.id)}" alt="" loading="lazy" />
@@ -1419,6 +1485,58 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
     return state.teams[myIndex].map((p) => p.name).join('\n\n');
   }
 
+  // ---------- chat ----------
+  const CHAT_MAX = 100; // keep only the last 100 messages in memory
+  let chatMessages = [];
+  let chatUnread = 0;
+  let chatOpen = false;
+
+  function updateChatBadge() {
+    const b = $('chat-badge');
+    if (chatUnread > 0) { b.textContent = chatUnread > 9 ? '9+' : String(chatUnread); b.classList.remove('hidden'); }
+    else b.classList.add('hidden');
+  }
+  function renderChatMsgs() {
+    const box = $('chat-msgs');
+    box.innerHTML = chatMessages.map((m) => {
+      if (m.sys) return `<div class="chat-msg sys"><span class="cm-text">${esc(m.text)}</span></div>`;
+      const color = playerColor(m.player);
+      return `<div class="chat-msg"><span class="cm-name" style="color:${color}">${esc(m.name)}</span><span class="cm-text">${esc(m.text)}</span></div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+  function addChatMsg(m) {
+    chatMessages.push(m);
+    if (chatMessages.length > CHAT_MAX) chatMessages.shift();
+    renderChatMsgs();
+    if (!chatOpen && !m.sys && m.player !== myIndex) { chatUnread++; updateChatBadge(); }
+  }
+  function openChat() {
+    chatOpen = true;
+    chatUnread = 0;
+    updateChatBadge();
+    $('chat-panel').classList.remove('hidden');
+    $('chat-fab').classList.add('hidden');
+    renderChatMsgs();
+    $('chat-input').focus();
+  }
+  function closeChat() {
+    chatOpen = false;
+    $('chat-panel').classList.add('hidden');
+    $('chat-fab').classList.remove('hidden');
+  }
+  function sendChat() {
+    const inp = $('chat-input');
+    const text = inp.value.trim();
+    if (!text) return;
+    if (socket) socket.emit('chat', text);
+    inp.value = '';
+  }
+  $('chat-fab').addEventListener('click', openChat);
+  $('chat-close').addEventListener('click', closeChat);
+  $('chat-send').addEventListener('click', sendChat);
+  $('chat-input').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
+
   // ---------- socket ----------
   const conn = $('conn');
   const noServer = $('no-server');
@@ -1433,8 +1551,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       state = s;
       myIndex = s.playerIndex;
       if (s.state !== 'waiting') startMusic(); // music begins once the lobby forms
+      $('chat-fab').classList.remove('hidden'); // chat is available once in a room
       render();
     });
+    socket.on('chat', (m) => addChatMsg(m));
     socket.on('action', (a) => showActionPopup(a));
     socket.on('error', (msg) => toast(msg, true));
     socket.on('connect', () => {
@@ -1443,9 +1563,10 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
       if (joinCode && state === null) {
         $('code-input').value = joinCode;
         const name = $('name-input').value.trim() || 'Player 2';
-        socket.emit('join', { playerId, name, code: joinCode.toUpperCase() }, (res) => {
+        socket.emit('join', { playerId, name, code: joinCode.toUpperCase(), color: myColor }, (res) => {
           if (!res.ok) return toast(res.error, true);
           myIndex = res.playerIndex;
+          if (res.color && res.color !== myColor) myColor = res.color;
           show('screen-lobby');
         });
       }
@@ -1456,6 +1577,5 @@ body.my-turn .auction-panel { border-color: rgba(95,217,122,.35); }
   }
   })();
   </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33cfc696b20dda1',t:'MTc4ODE4OTI3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v3d52b47920f24c319d37e2661827c42b1787588026925" integrity="sha512-d9sL6GJLXn6fInD1+TVXhTcQOsmxeHfmHAvwGDIxp5TO+uo1fiWW7mHomMj4MLRlCsJDTqXzWLHJFFlPCEIj/A==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a341b9c50b2208d1',t:'MTc4ODIzODk3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
